@@ -1,13 +1,13 @@
 import tkinter as tk
-import tkinter.ttk as tkk
+#import tkinter.ttk as tkk
 
 class Text(tk.Text):
     def __init__(self, *args, **kwargs):
         tk.Text.__init__(self, *args, **kwargs)
 
-    def get_pos(self):
+    def get_pos(self, mark=tk.INSERT):
         '''returns row and column as an int'''
-        return (int(x) for x in self.index(tk.INSERT).split('.'))
+        return (int(x) for x in self.index(mark).split('.'))
    
     def highlight_pattern(self, pattern, tag, start="1.0", end="end",
                                      regexp=False):
@@ -31,3 +31,5 @@ class Text(tk.Text):
            self.mark_set("matchStart", index)
            self.mark_set("matchEnd", "%s+%sc" % (index, count.get()))
            self.tag_add(tag, "matchStart", "matchEnd")
+
+    #def 

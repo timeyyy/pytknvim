@@ -2,5 +2,7 @@
 *.pyc
 *.pyo
 __pycache__/
-*.swp
+*.sw*
 *.*~
+.idea/
+*.egg-info

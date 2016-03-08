@@ -8,12 +8,8 @@ class Unnest(Exception):
 def _textwidget_rows(widget):
     '''Return all tkinter chars as rows'''
     # Rows start counting at 1 in tkinter text widget
-    end_row, end_col = (int(i) for i in widget.index('end').split('.'))
-    #end is the first garbage value'
-    #end_col = end_col - 1 
-    #if end_col == -1:
-        # have to go back to end of last line..
-    #    end_row == 
+    end_row, end_col = (int(i) for i in
+                        widget.index('end-1c').split('.'))
     try:
         for row in count(1):
             line = [] 
@@ -33,71 +29,73 @@ def _textwidget_rows(widget):
 
            
 def _nvim_rows(buff):
+    '''get all neovim rows'''
     all_rows = []
     for row in buff:
         all_rows.append(row.decode())
     return all_rows
 
 def _screen_rows(cells):
-    all_rows = []
+    '''get all rows of the internal screen '''
     for row in cells:
         line = []
         for char in row:
             line.append(char.text)
-        all_rows.append(''.join(i for i in line))
-    return all_rows
+        yield ''.join(i for i in line)
 
-def _parse_text(lines, line_length):
+def _parse(lines, line_length, eol_trim):
     '''
-    make the text ouput look like neovim,
-    remove ~ from start
-    remove end of line and spacing on the right
-    remove status bar stuff
-
-    we have to pad with spaces until the end of the column, then we add a space and a newline
-
-    the padding is required to be able to goto that position.
-    the space new line is important otherwise the cursor goes
-    down onto new line..
+    make the values for screen and tkinter text widget
+    look like neovims values,
+    neovim doesn't give us the ~ at the start,
+    also remove our newline chars and end spacing
+    also remove status bar stuff
     '''
+    # Unfortunatley the corde is a bit confusing
+    # I thought the handling was more similar than
+    # different for the two cases...
     all_rows = []
     for i, line in enumerate(lines):
+        # screen doesn't have a \n
+        if eol_trim:
+            assert line[-eol_trim:] == ' \n'
         try:
-            assert line[-2:] == ' \n'
+            assert len(line)-eol_trim  == line_length
         except AssertionError:
-            # the file name if none set [No Name]
-            if all_rows[-1][0] != '[No': 
+            # Todo does this line length need to match?
+            if '-- INSERT --' not in line:
                 raise
             break
-        try:
-            assert len(line)-2  == line_length
-        except AssertionError:
-            if line != '-- INSERT -- \n':
-                raise
-            break
-        # we cannot test with adding ~ at first col otherwise this will fail
         if line[0] == '~':
-            parsed = line[1:-2].rsplit()
-            import pdb;pdb.set_trace()# NEED TO MAKE TEXT DEL THE FIRST ~ on load... fuck me how?
+            if eol_trim: parsed = line[1:-eol_trim].rstrip()
+            else:
+                parsed = line[1:].rstrip()
             if not parsed: 
-                # do not add blanks that are squiggles
+                # do not add blank lists
                 continue
         else:
-            parsed = line[:-2].rsplit()
+            if eol_trim:
+                parsed = line[:-eol_trim].rstrip()
+            else:
+                parsed = line.rstrip()
             if not parsed:
                 parsed = ''
         all_rows.append(parsed)
     
-
-    # Remove the status bar
-    if '-- INSERT -- \n' == all_rows[-2]:
-        del all_rows[-2:]
-    else:
-        del all_rows[-1:]
+    # Remove the status bar (screen has a new line padded after)..
+    for i in range(1, 3):
+        abc = all_rows[-i]
+        if '[No Name]' in all_rows[-i]:
+            del all_rows[-i:]
+            break
     return all_rows
 
-#def _parsed_screen():
-    #all_rows = []
+
+def _parse_text(lines, line_length):
+    return _parse(lines, line_length, eol_trim=2)
+
+def _parse_screen(lines, line_length):
+    return _parse(lines, line_length, eol_trim=0)
 
 
 def compare_screens(mock_inst):
@@ -108,16 +106,16 @@ def compare_screens(mock_inst):
     nvim only makes the text (no spacing or newlines avaliable)
     
     '''
+    line_length = mock_inst._screen.columns
+
     nvim_rows = _nvim_rows(mock_inst.test_nvim.buffers[0])
     text_rows = _textwidget_rows(mock_inst.text)
     screen_rows = _screen_rows(mock_inst._screen._cells)
     
-    parsed_text = _parse_text(text_rows,
-                             line_length=mock_inst._screen.columns)
-    import pdb;pdb.set_trace()
-    #parsed_screen = _parse_screen(screen_rows)
+    parsed_text = _parse_text(text_rows, line_length)
+    parsed_screen = _parse_screen(screen_rows, line_length)
     assert len(nvim_rows) == len(parsed_text)
-    assert len(parsed_text) == len(screen_rows)
+    assert len(parsed_text) == len(parsed_screen)
 
     for nr, tr, sr in zip(nvim_rows, parsed_text, screen_rows):
         assert tr == nr

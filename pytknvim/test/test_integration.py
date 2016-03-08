@@ -16,7 +16,7 @@ from pytknvim.test.util import compare_screens, send_tk_key
 
 class MockNvimText(NvimTk):
     def thread_ui(self):
-        nvim = attach_socket('/tmp/nv10')
+        nvim = attach_socket('/tmp/nv6')
         if sys.version_info[0] > 2:
             nvim = nvim.with_hook(DecodeHook())
         ui = self
@@ -25,7 +25,7 @@ class MockNvimText(NvimTk):
         #self.root.after_idle(1, run_in_main)
 
         # seems we have to get another connection which i'm not wure how to do when embedded
-        self.test_nvim = attach_socket('/tmp/nv10')
+        self.test_nvim = attach_socket('/tmp/nv6')
         time.sleep(2)
 
     def run_in_main(self):

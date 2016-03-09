@@ -82,7 +82,7 @@ class MixTk():
 
 
     def _tk_key(self,event, **k):
-        print(event.__dict__)
+        #print(event.__dict__)
         keysym = event.keysym
         state = event.state
         if event.char not in ('', ' '):
@@ -126,13 +126,14 @@ class MixTk():
 
     def _clear_region(self, top, bot, left, right):
         '''
-        This is interesting.. maybe only for canvas?
+        Delete from top left to bottom right from the ui widget
         '''
-        print('clear region '+'top ',top,'  bot ', bot,' left ',left,' right ',right)
         self._flush()
         start = "%d.%d" % (top, left)
         end = "%d.%d" % (bot, right)
         self.text.delete(start, end)
+        print('from {0} to {0}'.format(start, end))
+        print(repr('clear {0}'.format(self.text.get(start, end))))
         
 
 class MixNvim():
@@ -186,11 +187,12 @@ class MixNvim():
 
     def _nvim_eol_clear(self):
         '''delete from index to end of line as well as new line char     and fill with whitespace...'''
-        print('doing nothing ...in eol row and cl -> ')
+        #print('doing nothing ...in eol row and cl -> ')
         return
         row, col = self._screen.row, self._screen.col
-        print('in eol row and cl -> ', str(self._screen.row), str(col))
-        self._clear_region(row, row, col, self._screen.right + 1)
+        print('eol')
+        # + 2 because the space and new line we add at the end
+        self._clear_region(row+1, row+1, col, self._screen.right+2)
         self._screen.eol_clear()
         #row, col = self.text.get_pos()
         #self.text.delete("{0}.{1}".format(row, col),
@@ -314,7 +316,7 @@ class MixNvim():
         when a new row is being edited
         '''
         # choose a Font instance
-        print('put was called row %s col %s ' % (self._screen.row, self._screen.col))
+        print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
         if self._screen.row != self._pending[0]:
             #print(repr('flushing %s ' % text))
             # write to screen if vim puts stuff on  a new line
@@ -520,18 +522,24 @@ class MixNvim():
        # markup = []
         # Tkinter row starts at 1
         row = row + 1
-        # Todo,.. don't really get how this can return more than 1 value if the lines are operational..
-        for text, attrs in data:
-            # The space is required otherwise the curosr goes onto a new line
-            # The new line is required because the first char of a line is the \n
-            # which we always replace
-            text = '\n{0} '.format(text)
-            start = "{0}.{1}".format(row, col)
-            end = start+'+{0}c'.format(len(text)+1)
-            print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
-            self.text.delete(start, end)
-            self.text.insert(start, text)
-        self.text.insert(end, '\n')
+        # The space is required otherwise the curosr goes onto a new line
+        # The new line is required because the first char of a line is the \n
+        start = "{0}.{1}".format(row, col)
+        if self.text.get(start) != '\n':
+            # Todo,.. don't really get how this can return more than 1 value if the lines are operational..
+            for text, attrs in data:
+                text = '{0} '.format(text) 
+                end = start+'+{0}c'.format(len(text))
+                self.text.delete(start, end)
+                self.text.insert(start, text)
+        else:
+            for text, attrs in data:
+                text = '\n{0} '.format(text)
+                end = start+'+{0}c'.format(len(text)+1)
+                self.text.delete(start, end)
+                self.text.insert(start, text)
+            self.text.insert(end, '\n')
+        print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
         # Move the cursor 
         self.text.mark_set(tk.INSERT, '{0}-2c'.format(end))
             #if not attrs:
@@ -646,7 +654,7 @@ class NvimFriendly(NvimTk):
                         insertwidth=4,
                         insertontime=600,
                         insertofftime=150,
-                        insertbackground='#FF2121',
+                        insertbackground='#21F221',
                         insertborderwidth=0) 
         super()._nvim_mode_change(mode)
         if mode  == 'insert':

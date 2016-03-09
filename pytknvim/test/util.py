@@ -136,11 +136,12 @@ class Event():
 def send_tk_key(tknvim, key):
     '''
     send a key through to our class as a tkinter event
-    no modifyers as of yet, specia
+    no modifyers as of yet, speical keys can be
+    passed as tkinter or vim keys i.e Esc
     '''
     if len(key) == 1:
         event = Event(key)
-        tknvim.__tk_key(event)
+        tknvim._tk_key(event)
     else:
         for value in KEY_TABLE.values():
             if value == key:
@@ -151,6 +152,6 @@ def send_tk_key(tknvim, key):
             else:
                 raise KeyError('Please pass an acceptable key in')
         tknvim._bridge.input(key)
-    time.sleep(0.15)
+    time.sleep(0.05)
     
     

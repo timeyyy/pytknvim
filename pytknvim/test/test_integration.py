@@ -16,41 +16,55 @@ from pytknvim.test.util import compare_screens, send_tk_key
 
 class MockNvimText(NvimTk):
     def thread_ui(self):
-        nvim = attach_socket('/tmp/nv7')
+        nvim = attach_socket('/tmp/nv17')
         if sys.version_info[0] > 2:
             nvim = nvim.with_hook(DecodeHook())
         ui = self
         self._bridge = UIBridge()
         thread.start_new_thread(self._bridge.connect, (nvim, ui) )
 
-        self.test_nvim = attach_socket('/tmp/nv7')
-        time.sleep(1)
+        self.test_nvim = attach_socket('/tmp/nv17')
+        time.sleep(0.5)
 
     def run_in_main(self):
         pass
 
 class TestIntegration():
-        
+
+
     def setup_class(cls):
         cls.nvimtk = MockNvimText()
         cls.nvimtk.thread_ui()
 
     def teardown_class(cls):
-        '''just for sanity check'''
-        compare_screens(TestIntegration.nvimtk)
+        cls.nvimtk.quit()
+        time.sleep(0.5)
+        
 
     def teardown_method(self, method):
         '''delete everything so we get a clean slate'''
-        tknvim = TestIntegration.nvimtk
-        buf = tknvim.test_nvim.buffers[0]
+        buf = self.nvimtk.test_nvim.buffers[0]
         buf[:] = [""]
 
+
+    def send_tk_key(self, *keys):
+        for key in keys:
+            send_tk_key(self.nvimtk, key)
+
+
+    def compare_screens(self):
+        compare_screens(self.nvimtk)
+
+
     def test_load(self):
-        compare_screens(TestIntegration.nvimtk)
+        self.compare_screens()
+
 
     def test_basic_insert(self):
-        #nvimtk = MockNvimText()
-        #nvimtk.thread_ui()
-        pass
-        compare_screens(TestIntegration.nvimtk)
+        self.send_tk_key('i')
+        self.compare_screens()
+        self.send_tk_key('a')
+        self.compare_screens()
+        self.send_tk_key('b', 'c', 'd', 'e')
+        self.compare_screens()
 

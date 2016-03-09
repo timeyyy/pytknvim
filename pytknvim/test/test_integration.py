@@ -16,25 +16,41 @@ from pytknvim.test.util import compare_screens, send_tk_key
 
 class MockNvimText(NvimTk):
     def thread_ui(self):
-        nvim = attach_socket('/tmp/nv6')
+        nvim = attach_socket('/tmp/nv7')
         if sys.version_info[0] > 2:
             nvim = nvim.with_hook(DecodeHook())
         ui = self
         self._bridge = UIBridge()
         thread.start_new_thread(self._bridge.connect, (nvim, ui) )
-        #self.root.after_idle(1, run_in_main)
 
-        # seems we have to get another connection which i'm not wure how to do when embedded
-        self.test_nvim = attach_socket('/tmp/nv6')
-        time.sleep(2)
+        self.test_nvim = attach_socket('/tmp/nv7')
+        time.sleep(1)
 
     def run_in_main(self):
         pass
 
 class TestIntegration():
         
+    def setup_class(cls):
+        cls.nvimtk = MockNvimText()
+        cls.nvimtk.thread_ui()
+
+    def teardown_class(cls):
+        '''just for sanity check'''
+        compare_screens(TestIntegration.nvimtk)
+
+    def teardown_method(self, method):
+        '''delete everything so we get a clean slate'''
+        tknvim = TestIntegration.nvimtk
+        buf = tknvim.test_nvim.buffers[0]
+        buf[:] = [""]
+
     def test_load(self):
-        nvimtk = MockNvimText()
-        nvimtk.thread_ui()
-        compare_screens(nvimtk)
+        compare_screens(TestIntegration.nvimtk)
+
+    def test_basic_insert(self):
+        #nvimtk = MockNvimText()
+        #nvimtk.thread_ui()
+        pass
+        compare_screens(TestIntegration.nvimtk)
 

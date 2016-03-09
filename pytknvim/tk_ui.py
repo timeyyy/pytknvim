@@ -82,6 +82,7 @@ class MixTk():
 
 
     def _tk_key(self,event, **k):
+        print(event.__dict__)
         keysym = event.keysym
         state = event.state
         if event.char not in ('', ' '):
@@ -166,6 +167,9 @@ class MixNvim():
 
 
     def _nvim_clear(self):
+        '''
+        wipe everyything, even the ~ and status bar
+        '''
         print('clear top {0} bot {1} left {2} right {3}'.format(self._screen.top, self._screen.bot+1, self._screen.left, self._screen.right+1))
         self._clear_region(self._screen.top+1, self._screen.bot + 2,
                            self._screen.left, self._screen.right+1)
@@ -310,7 +314,7 @@ class MixNvim():
         when a new row is being edited
         '''
         # choose a Font instance
-        #print('put was called row %s col %s ' % (self._screen.row, self._screen.col))
+        print('put was called row %s col %s ' % (self._screen.row, self._screen.col))
         if self._screen.row != self._pending[0]:
             #print(repr('flushing %s ' % text))
             # write to screen if vim puts stuff on  a new line

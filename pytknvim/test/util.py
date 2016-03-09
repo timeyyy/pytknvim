@@ -84,7 +84,6 @@ def _parse(lines, line_length, eol_trim):
     
     # Remove the status bar (screen has a new line padded after)..
     for i in range(1, 3):
-        abc = all_rows[-i]
         if '[No Name]' in all_rows[-i]:
             del all_rows[-i:]
             break
@@ -124,20 +123,34 @@ def compare_screens(mock_inst):
 class Event():
     def __init__(self, key):
         '''
+        mimics a tkinter key press event.
         this only works for normal key presses, no f1 or space etc
         '''
-        self.keysym = key
-        self.char = key
-        self.state = 0
-        self.keycode = ord(key)
-        self.keysym_num= ord(key)
+        if len(key) == 1:
+            self.keysym = key
+            self.char = key
+            self.state = 0
+            self.keycode = ord(key)
+            self.keysym_num= ord(key)
 
 def send_tk_key(tknvim, key):
     '''
-    send a normal key through to our class as a tkinter event
+    send a key through to our class as a tkinter event
+    no modifyers as of yet, specia
     '''
-    event = Event(key)
-    tknvim.__tk_key(event)
-    time.sleep(0.5)
+    if len(key) == 1:
+        event = Event(key)
+        tknvim.__tk_key(event)
+    else:
+        for value in KEY_TABLE.values():
+            if value == key:
+                break
+        else:
+            if key in KEY_TABLE:
+                key = KEY_TABLE[key]
+            else:
+                raise KeyError('Please pass an acceptable key in')
+        tknvim._bridge.input(key)
+    time.sleep(0.15)
     
     

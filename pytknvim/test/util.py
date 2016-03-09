@@ -1,5 +1,7 @@
 from itertools import count
 import time
+import string
+import random
 
 class Unnest(Exception):
     '''Used to exit a nested loop'''
@@ -155,3 +157,9 @@ def send_tk_key(tknvim, key):
     time.sleep(0.05)
     
     
+def rand_str(length):
+    '''returns a random string of length'''
+    chars = []
+    for i in range(length):
+        chars.append(random.choice(string.ascii_letters))
+    return ''.join(char for char in chars)

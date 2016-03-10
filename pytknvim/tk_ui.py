@@ -313,7 +313,7 @@ class MixNvim():
         put a charachter into position, we only write the lines
         when a new row is being edited
         '''
-        print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
+       # print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
         if self._screen.row != self._pending[0]:
             # write to screen if vim puts stuff on  a new line
             self._flush()

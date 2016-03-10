@@ -51,8 +51,14 @@ class VimCommands():
         self.v_normal_mode()
         self.send_tk_key('b')
 
+    def v_delete_line(self):
+        self.v_normal_mode()
+        self.send_tk_key('d')
+        self.send_tk_key('d')
 
-
+    def v_up(self):
+        self.v_normal_mode()
+        self.send_tk_key('k')
 
 
 class TestIntegration(VimCommands):
@@ -113,6 +119,24 @@ class TestIntegration(VimCommands):
         self.send_tk_key('1','2','3')
         self.send_tk_key('Enter')
         self.compare_screens()
+
+
+    def test_delete_line(self):
+        self.v_insert_mode()
+        self.send_tk_key('o', 'n', 'e')
+        self.v_delete_line()
+        self.compare_screens()
+        self.v_insert_mode()
+        self.send_tk_key('o', 'n', 'e')
+        self.send_tk_key('Enter')
+        self.send_tk_key('t', 'w', 'o')
+        self.send_tk_key('Enter')
+        self.send_tk_key('t', 'h', 'r', 'e','e')
+        self.compare_screens()
+        self.v_up()
+        self.v_delete_line()
+        self.compare_screens()
+        import pdb;pdb.set_trace()
 
 
 

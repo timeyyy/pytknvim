@@ -162,6 +162,6 @@ def send_tk_key(tknvim, key):
                 raise KeyError('Please pass an acceptable key in')
         vimified = '<' + '-'.join(key) + '>'
         tknvim._bridge.input(vimified)
-    time.sleep(0.03)
+    time.sleep(0.01)
     
     

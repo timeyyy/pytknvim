@@ -1,11 +1,13 @@
 from itertools import count
 import time
-import string
-import random
+
+from pytknvim.tk_ui import KEY_TABLE
+
 
 class Unnest(Exception):
     '''Used to exit a nested loop'''
     pass
+
 
 def _textwidget_rows(widget):
     '''Return all tkinter chars as rows'''
@@ -37,6 +39,7 @@ def _nvim_rows(buff):
         all_rows.append(row.decode())
     return all_rows
 
+
 def _screen_rows(cells):
     '''get all rows of the internal screen '''
     for row in cells:
@@ -44,6 +47,7 @@ def _screen_rows(cells):
         for char in row:
             line.append(char.text)
         yield ''.join(i for i in line)
+
 
 def _parse(lines, line_length, eol_trim):
     '''
@@ -95,6 +99,7 @@ def _parse(lines, line_length, eol_trim):
 def _parse_text(lines, line_length):
     return _parse(lines, line_length, eol_trim=2)
 
+
 def _parse_screen(lines, line_length):
     return _parse(lines, line_length, eol_trim=0)
 
@@ -122,6 +127,7 @@ def compare_screens(mock_inst):
         assert tr == nr
         assert tr == sr
 
+
 class Event():
     def __init__(self, key):
         '''
@@ -134,6 +140,7 @@ class Event():
             self.state = 0
             self.keycode = ord(key)
             self.keysym_num= ord(key)
+
 
 def send_tk_key(tknvim, key):
     '''
@@ -153,13 +160,8 @@ def send_tk_key(tknvim, key):
                 key = KEY_TABLE[key]
             else:
                 raise KeyError('Please pass an acceptable key in')
-        tknvim._bridge.input(key)
-    time.sleep(0.05)
+        vimified = '<' + '-'.join(key) + '>'
+        tknvim._bridge.input(vimified)
+    time.sleep(0.03)
     
     
-def rand_str(length):
-    '''returns a random string of length'''
-    chars = []
-    for i in range(length):
-        chars.append(random.choice(string.ascii_letters))
-    return ''.join(char for char in chars)

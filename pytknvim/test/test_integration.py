@@ -37,8 +37,25 @@ class MockNvimText(NvimTk):
         self.test_nvim = attach_headless(named_pipe)
         time.sleep(1)
 
+class VimCommands():
+    '''
+    Just for readablility
+    '''
+    def v_insert_mode(self):
+        self.send_tk_key('i')
 
-class TestIntegration():
+    def v_normal_mode(self):
+        self.send_tk_key('Esc')
+
+    def v_back(self):
+        self.v_normal_mode()
+        self.send_tk_key('b')
+
+
+
+
+
+class TestIntegration(VimCommands):
 
 
     def setup_class(cls):
@@ -75,20 +92,27 @@ class TestIntegration():
 
 
     def test_basic_insert(self):
-        self.send_tk_key('i')
+        self.v_insert_mode()
         self.compare_screens()
         self.send_tk_key('a')
         self.compare_screens()
         self.send_tk_key('b', 'c', 'd', 'e')
         self.compare_screens()
 
+
     def test_enter_key(self):
-        self.send_tk_key('i')
+        self.v_insert_mode()
         self.send_tk_key('b', 'c', 'd', 'e')
         self.send_tk_key('Enter')
         self.send_tk_key('Enter')
         self.compare_screens()
         self.send_tk_key('f', 'g', 'h')
         self.compare_screens()
+        self.v_back()
+        self.v_insert_mode()
+        self.send_tk_key('1','2','3')
+        self.send_tk_key('Enter')
+        self.compare_screens()
+
 
 

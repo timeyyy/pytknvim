@@ -94,7 +94,6 @@ class MixTk():
                 return
         if keysym in tk_modifiers:
             # We don't need to track the state of modifier bits
-            #print('returning because of modifer')
             return
         if keysym.startswith('KP_'):
             keysym = keysym[3:]

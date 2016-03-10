@@ -1,7 +1,7 @@
 from itertools import count
 import time
 
-from pytknvim.tk_ui import KEY_TABLE
+from pytknvim.tk_ui import KEY_TABLE, _stringify_key
 
 
 class Unnest(Exception):
@@ -129,29 +129,36 @@ def compare_screens(mock_inst):
 
 
 class Event():
-    def __init__(self, key):
+    def __init__(self, key, modifyer=None):
         '''
         mimics a tkinter key press event.
-        this only works for normal key presses, no f1 or space etc
+        this just fudges it enough so it passes the checks for our function...
         '''
-        if len(key) == 1:
-            self.keysym = key
-            self.char = key
-            self.state = 0
-            self.keycode = ord(key)
-            self.keysym_num= ord(key)
+        self.keysym = key
+        self.char = key
+        self.state = 0
+        self.keycode = ord(key)
+        self.keysym_num= ord(key)
+        if modifyer:
+            self.state = 1337
+            self.keysym = modifyer.capitalize()
 
 
-def send_tk_key(tknvim, key):
+
+
+
+def send_tk_key(tknvim, key, modifyer=None):
     '''
     send a key through to our class as a tkinter event
-    no modifyers as of yet, speical keys can be
     passed as tkinter or vim keys i.e Esc
+    pass in a modifyer as, shift, alt, or ctrl
     '''
+    assert modifyer in ('shift', 'alt', 'ctrl', None)
     if len(key) == 1:
-        event = Event(key)
+        event = Event(key, modifyer)
         tknvim._tk_key(event)
     else:
+        # Special key
         for value in KEY_TABLE.values():
             if value == key:
                 break
@@ -160,7 +167,7 @@ def send_tk_key(tknvim, key):
                 key = KEY_TABLE[key]
             else:
                 raise KeyError('Please pass an acceptable key in')
-        vimified = '<' + '-'.join(key) + '>'
+        vimified = _stringify_key(key, [])
         tknvim._bridge.input(vimified)
     time.sleep(0.01)
     

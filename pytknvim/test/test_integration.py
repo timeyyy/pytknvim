@@ -8,6 +8,7 @@ import time
 import _thread as thread
 from subprocess import Popen, PIPE
 
+import pytest
 from neovim.ui.ui_bridge import UIBridge
 from neovim.api import DecodeHook
 
@@ -25,7 +26,7 @@ class MockNvimText(NvimTk):
 
     def thread_ui(self):
         '''starts our us threaded so we can run tests'''
-        named_pipe = '/tmp/nvim{0}'.format(rand_str(4))
+        named_pipe = '/tmp/nvim{0}'.format(rand_str(16))
         nvim = attach_headless(named_pipe)
         if sys.version_info[0] > 2:
             nvim = nvim.with_hook(DecodeHook())
@@ -43,6 +44,8 @@ class TestIntegration():
     def setup_class(cls):
         cls.nvimtk = MockNvimText()
         cls.nvimtk.thread_ui()
+        # This one has to be used because of threads and locks
+        cls.nvim = cls.nvimtk.test_nvim
 
     def teardown_class(cls):
         # Have to figure out how to teardown properlly 
@@ -81,11 +84,11 @@ class TestIntegration():
 
     def test_enter_key(self):
         self.send_tk_key('i')
+        self.send_tk_key('b', 'c', 'd', 'e')
         self.send_tk_key('Enter')
         self.send_tk_key('Enter')
         self.compare_screens()
-        self.send_tk_key('a')
+        self.send_tk_key('f', 'g', 'h')
         self.compare_screens()
-        import pdb;pdb.set_trace()
 
 

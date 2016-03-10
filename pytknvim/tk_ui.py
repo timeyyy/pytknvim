@@ -132,7 +132,7 @@ class MixTk():
         start = "%d.%d" % (top, left)
         end = "%d.%d" % (bot, right)
         self.text.delete(start, end)
-        print('from {0} to {0}'.format(start, end))
+        print('from {0} to {1}'.format(start, end))
         print(repr('clear {0}'.format(self.text.get(start, end))))
         
 
@@ -176,7 +176,7 @@ class MixNvim():
                            self._screen.left, self._screen.right+1)
         self._screen.clear()
 
-        # nvim fills all lines with spaces besides the first
+        # nvim fills all lines with spaces besides the first...
         for col in range(self._screen.columns):
             self.text.insert('1.{0}'.format(col), ' ')
         self.text.insert('1.{0}'.format(self._screen.columns+1), ' \n')
@@ -186,32 +186,22 @@ class MixNvim():
 
 
     def _nvim_eol_clear(self):
-        '''delete from index to end of line as well as new line char     and fill with whitespace...'''
-        #print('doing nothing ...in eol row and cl -> ')
-        return
+        '''delete from index to end of line, fill with whitespace'''
         row, col = self._screen.row, self._screen.col
-        print('eol')
         # + 2 because the space and new line we add at the end
         self._clear_region(row+1, row+1, col, self._screen.right+2)
         self._screen.eol_clear()
-        #row, col = self.text.get_pos()
-        #self.text.delete("{0}.{1}".format(row, col),
-                         #"{0}.{1}".format(row, self.current_cols))
-        #self.text.insert(tk.INSERT, "".join(" " for i in range(self.current_cols - col)))
-
-        #print('EOL CLEAR from', "{0}.{1}".format(row, col), 'to ',"{0}.{1}".format(row, self.current_cols))
+        # + 1 because of the empty space at the end
+        self.text.insert("%d.%d"%(row+1, col), "".join(" " for i in range(1 + self.current_cols - col)))
+        self.text.mark_set(tk.INSERT, "{0}.{1}".format(row+1, col))
 
 
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
         # Tkinter row starts at 1 while col starts at 0
-        #print(self._screen)
         print('goto ','row ',str(row), ' col ', col)
         self._screen.cursor_goto(row, col)
         self.text.mark_set(tk.INSERT, "{0}.{1}".format(row+1, col))
-        if row == 0 and col == 0:
-            pass
-            #import pdb;pdb.set_trace()
 
 
     def _nvim_busy_start(self):
@@ -242,6 +232,7 @@ class MixNvim():
 
     def _nvim_scroll(self, count):
         print('scroll count -> ',str(count))
+        return
         #col, row = self.text.index(tk.INSERT).split('.')
         #move_to = int(col) + count
         #print(col, move_to)
@@ -315,18 +306,14 @@ class MixNvim():
         put a charachter into position, we only write the lines
         when a new row is being edited
         '''
-        # choose a Font instance
         print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
         if self._screen.row != self._pending[0]:
-            #print(repr('flushing %s ' % text))
             # write to screen if vim puts stuff on  a new line
             self._flush()
 
-        #print(repr('putting in pending %s ' % text))
         self._screen.put(text, self._attrs)
         self._pending[1] = min(self._screen.col - 1, self._pending[1])
         self._pending[2] = max(self._screen.col, self._pending[2])
-        # print('put', repr(text), self._pending)
         #font = self._fnormal
         #if self._attrs.get('bold', False):
             #font = self._fbold
@@ -341,9 +328,6 @@ class MixNvim():
             #status bar text???
             #print('throwing away ->', text)
             #return
-        if self._screen.row == 4:
-            #import pdb;pdb.set_trace()
-            pass
 
 
     def _nvim_bell(self):
@@ -541,7 +525,7 @@ class MixNvim():
             self.text.insert(end, '\n')
         print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
         # Move the cursor 
-        self.text.mark_set(tk.INSERT, '{0}-2c'.format(end))
+        self.text.mark_set(tk.INSERT, '{0}-1c'.format(end))
             #if not attrs:
                 #attrs = self._get_pango_attrs(None)
             #attrs = attrs[1] if cursor else attrs[0]
@@ -632,10 +616,10 @@ class NvimTk(MixNvim, MixTk):
         def do():
             apply_updates()
             self._flush()
-            self.text.tag_remove('blue', '1.0', 'end')
-            self.text.tag_remove('red',"1.0", 'end')
-            self.text.highlight_pattern('\n', 'blue')
-            self.text.highlight_pattern(' ', 'red')
+            #self.text.tag_remove('blue', '1.0', 'end')
+            #self.text.tag_remove('red',"1.0", 'end')
+            #self.text.highlight_pattern('\n', 'blue')
+            #self.text.highlight_pattern(' ', 'red')
         self.root.after_idle(do)
 
     def quit(self):

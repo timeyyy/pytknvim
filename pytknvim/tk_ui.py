@@ -85,6 +85,14 @@ class MixTk():
         #print(event.__dict__)
         keysym = event.keysym
         state = event.state
+        if event.char == '9':
+            self.text.tag_remove('blue', '1.0', 'end')
+            self.text.tag_remove('red',"1.0", 'end')
+            self.text.highlight_pattern('\n', 'blue')
+            self.text.highlight_pattern(' ', 'red')
+        if event.char == '8':
+            self.text.tag_remove('blue', '1.0', 'end')
+            self.text.tag_remove('red',"1.0", 'end')
         if event.char not in ('', ' '):
             #if not event.state:
             if event.keysym_num == ord(event.char):
@@ -553,7 +561,18 @@ class MixNvim():
 class NvimTk(MixNvim, MixTk):
     '''
     Business Logic for making a tkinter neovim text widget
+
+    we get keys, mouse movements inside tkinter, using binds,
+    These binds are handed off to neovim using _input
+
+    Neovim interpruts the actions and calls certain
+    functions which are defined and implemented in tk
+
+    The api from neovim does stuff line by line,
+    so each callback from neovim produces a series
+    of miniscule actions which in the end updates a line
     '''
+
     def __init__(self):
         # we destroy this when the layout changes
         self.toplevel = None
@@ -579,10 +598,7 @@ class NvimTk(MixNvim, MixTk):
         self.root = tk.Tk()
         self.root.protocol('WM_DELETE_WINDOW', self._tk_quit)
         text = tk_util.Text(self.root)
-        #text = tk.Text(self.root)
         self.text = text
-        # Nvim starts its actions on the 2nd line and we need padding to be able to do that in tkinter
-        #self.text.insert('1.0',' ' * self.current_cols + ' \n')
 
         # Remove Default Bindings and what happens on insert etc
         bindtags = list(text.bindtags())
@@ -594,7 +610,7 @@ class NvimTk(MixNvim, MixTk):
 
         text.bind('<Key>', self._tk_key)
         text.bind('<Configure>', self._tk_resize)
-        #text.bind(
+
         # The negative number makes it pixels instead of point sizes
         self._fnormal = tkfont.Font(family='Monospace', size=13)
         self._fbold = tkfont.Font(family='Monospace', weight='bold', size=13)
@@ -615,14 +631,11 @@ class NvimTk(MixNvim, MixTk):
         def do():
             apply_updates()
             self._flush()
-            #self.text.tag_remove('blue', '1.0', 'end')
-            #self.text.tag_remove('red',"1.0", 'end')
-            #self.text.highlight_pattern('\n', 'blue')
-            #self.text.highlight_pattern(' ', 'red')
         self.root.after_idle(do)
 
     def quit(self):
         self.root.after_idle(self.root.quit)
+
 
 class NvimFriendly(NvimTk):
     '''Meant to be subclassed so the user can tweak easily,
@@ -671,11 +684,3 @@ def main(address=None):
 if __name__ == '__main__':
     main()
         
-'''
-so we get keys, mouse movements inside tkinter, using binds,
-These binds are handed off to neovim using _input
-
-Neovim interpruts the actions and we get a function that we run in our mainloop, we implement the functions in our gui toolkit
-
-Neovimso far does stuff line by line, so each callback from neovim produces a series of minisucpe actions which in the end updates a line
-'''

@@ -7,7 +7,7 @@ import neovim
 from neovim.ui.ui_bridge import UIBridge
 from neovim import attach
 from neovim.ui.screen import Screen
-#from tkquick.gui.tools import rate_limited, delay_call
+from tkquick.gui.tools import rate_limited, delay_call
 
 from pytknvim import tk_util
 
@@ -115,7 +115,6 @@ class MixTk():
         self._bridge.exit()
 
     
-    #@delay_call(1)
     def _tk_resize(self, event):
         '''Let Neovim know we are changing size'''
         if not self._screen:
@@ -126,10 +125,10 @@ class MixTk():
             return
         self.current_cols = cols
         self.current_rows = rows
-        #self._bridge.resize(cols, rows)
+        self._bridge.resize(cols, rows)
         print('resizing c, r, w, h', cols,rows, event.width, event.height)
-        self.root.after_idle(lambda:self._bridge.resize(cols, rows))
-        time.sleep(1)
+        #self.root.after_idle(lambda:self._bridge.resize(cols, rows))
+        #time.sleep(1)
 
     def _clear_region(self, top, bot, left, right):
         '''
@@ -141,6 +140,20 @@ class MixTk():
         self.text.delete(start, end)
         print('from {0} to {1}'.format(start, end))
         print(repr('clear {0}'.format(self.text.get(start, end))))
+
+    def bind_resize(self):
+        '''
+        after calling,
+        widget changes will now be passed along to neovim
+        '''
+        self._configure_id = self.text.bind('<Configure>', self._tk_resize)
+
+    def unbind_resize(self):
+        '''
+        after calling,
+        widget size changes will not be passed along to nvim
+        '''
+        self.text.unbind('<Configure>', self._configure_id)
         
 
 class MixNvim():
@@ -148,10 +161,15 @@ class MixNvim():
 
     '''These methods get called by neovim'''
 
-    #@delay_call(1)
-    def _delayed_nvim_resize(self, width, height):
-        self.text.master.geometry('%dx%d' % (width, height))
+    @delay_call(0.1)
+    def _delayed_update(self):
+        '''
+        update will be postponed by the above seconds each
+        time the function gets called
+        '''
+        self.unbind_resize()
         self.text.master.update_idletasks()# REALLY SLOWS THINGS DOWN...
+        self.bind_resize()
 
     def _nvim_resize(self, cols, rows):
         '''Let neovim update tkinter when neovim changes size'''
@@ -161,16 +179,18 @@ class MixNvim():
         # also steal logic from gtk for faster updateing..
         self._screen = Screen(cols, rows)
 
+        #print('nv resize rows and cols are : ',str(rows),'.',str(cols))
 
-        print('nv resize rows and cols are : ',str(rows),'.',str(cols))
-        width = cols * self._colsize
-        height = rows * self._rowsize
         def resize():
+            width = cols * self._colsize
+            height = rows * self._rowsize
+            self.unbind_resize()
             self.text.master.geometry('%dx%d' % (width, height))
-            #self.text.master.update_idletasks() REALLY SLOWS THINGS DOWN...
+            self.bind_resize()
 
         #print('resize', 'cols ',str(cols),'rows ',str(rows))
         self.root.after_idle(resize)
+        self._delayed_update()
         #self.root.after_idle(self._delayed_nvim_resize, width, height)
 
 
@@ -206,7 +226,7 @@ class MixNvim():
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
         # Tkinter row starts at 1 while col starts at 0
-        print('goto ','row ',str(row), ' col ', col)
+        #print('goto ','row ',str(row), ' col ', col)
         self._screen.cursor_goto(row, col)
         self.text.mark_set(tk.INSERT, "{0}.{1}".format(row+1, col))
 
@@ -234,19 +254,14 @@ class MixNvim():
 
     def _nvim_set_scroll_region(self, top, bot, left, right):
         print('set scroll regione -> ')
+        print(top, bot, left, right)
         self._screen.set_scroll_region(top, bot, left, right)
 
 
     def _nvim_scroll(self, count):
         print('scroll count -> ',str(count))
-        return
-        #col, row = self.text.index(tk.INSERT).split('.')
-        #move_to = int(col) + count
-        #print(col, move_to)
-        #self.text.yview(move_to)
-
-        self._flush()
-        top, bot = self._screen.top+1, self._screen.bot + 2
+        #self._flush()
+        top, bot = self._screen.top, self._screen.bot + 1
         left, right = self._screen.left, self._screen.right + 1
         # The diagrams below illustrate what will happen, depending on the
         # scroll direction. "=" is used to represent the SR(scroll region)
@@ -282,6 +297,21 @@ class MixNvim():
             src_top, src_bot = top, bot + count
             dst_top, dst_bot = top - count, bot
             clr_top, clr_bot = src_top, dst_top
+        row, col = self.text.get_pos()
+        print(row,col)
+        #move_to = int(row) + count
+        #print(col, move_to)
+        #self.text.yview(move_to)
+        #self.text.see()
+        #if count == 1:
+        #    self.text.delete("%d.%d"%(row,0), "%d.%d"%(row+1,0))
+
+        #if count == -1:
+        #    self.text.delete("%d.%d"%(row,0), "%d.%d"%(row+1,0))
+
+        delta = dst_top - src_top
+        print(dst_top, dst_bot, left, right)
+        print(clr_top, clr_bot, left, right)
         #self._cairo_surface.flush()
         #self._cairo_context.save()
         # The move is performed by setting the source surface to itself, but
@@ -294,8 +324,20 @@ class MixNvim():
         #self._cairo_context.paint()
         #self._cairo_context.restore()
         # Clear the emptied region
-        self._clear_region(clr_top, clr_bot, left, right)
-        self._screen.scroll(count)
+        #self._clear_region(clr_top, clr_bot, left, right+2)
+        start, stop, step = self._screen.scroll(count)
+        #start += 1
+        #stop += 1
+        #print(self._screen._cells[0:3])
+        print(start, stop, step)
+        self._nvim_cursor_goto(start, 0)
+        for i, row in enumerate(self._screen._cells[start:stop:step]):
+            for col in row:
+                self._nvim_put(col.text)
+            #print(start+i*step, row)
+            self._nvim_cursor_goto(start + i*step, 0)
+
+        
 
 
     def _nvim_highlight_set(self, attrs):
@@ -313,9 +355,10 @@ class MixNvim():
         put a charachter into position, we only write the lines
         when a new row is being edited
         '''
-       # print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
+        #print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
         if self._screen.row != self._pending[0]:
             # write to screen if vim puts stuff on  a new line
+            print('calling flush from put')
             self._flush()
 
         self._screen.put(text, self._attrs)
@@ -486,11 +529,10 @@ class MixNvim():
         if startcol == endcol:
             #print('startcol is endcol return, row %s col %s'% (self._screen.row, self._screen.col))
             return
-        #print('pass the startcolendcol check: row %s col %s' % (self._screen.row, self._screen.col))
-        #self._cairo_context.save()
         ccol = startcol
         buf = []
         bold = False
+        print('start row in flush is', row)
         for _, col, text, attrs in self._screen.iter(row, row, startcol,
                                                      endcol - 1):
             newbold = attrs and 'bold' in attrs[0]
@@ -609,7 +651,7 @@ class NvimTk(MixNvim, MixTk):
         text.focus_set()
 
         text.bind('<Key>', self._tk_key)
-        text.bind('<Configure>', self._tk_resize)
+        self.bind_resize()
 
         # The negative number makes it pixels instead of point sizes
         self._fnormal = tkfont.Font(family='Monospace', size=13)
@@ -680,6 +722,8 @@ def main(address=None):
     bridge = UIBridge()
     bridge.connect(nvim, ui)
     #_thread.start_new_thread(bridge.connect, (nvim, ui) )
+    if len(sys.argv) > 1:
+        nvim.command('edit ' + sys.argv[1])
 
 if __name__ == '__main__':
     main()

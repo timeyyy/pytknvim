@@ -251,90 +251,17 @@ class MixNvim():
 
 
     def _nvim_set_scroll_region(self, top, bot, left, right):
-        print('set scroll regione -> ')
-        print(top, bot, left, right)
         self._screen.set_scroll_region(top, bot, left, right)
 
 
     def _nvim_scroll(self, count):
-        print('scroll count -> ',str(count))
-        #self._flush()
-        top, bot = self._screen.top, self._screen.bot + 1
-        left, right = self._screen.left, self._screen.right + 1
-        # The diagrams below illustrate what will happen, depending on the
-        # scroll direction. "=" is used to represent the SR(scroll region)
-        # boundaries and "-" the moved rectangles. note that dst and src share
-        # a common region
-        if count > 0:
-            # move an rectangle in the SR up, this can happen while scrolling
-            # down
-            # +-------------------------+
-            # | (clipped above SR)      |            ^
-            # |=========================| dst_top    |
-            # | dst (still in SR)       |            |
-            # +-------------------------+ src_top    |
-            # | src (moved up) and dst  |            |
-            # |-------------------------| dst_bot    |
-            # | src (cleared)           |            |
-            # +=========================+ src_bot
-            src_top, src_bot = top + count, bot
-            dst_top, dst_bot = top, bot - count
-            clr_top, clr_bot = dst_bot, src_bot
-        else:
-            # move a rectangle in the SR down, this can happen while scrolling
-            # up
-            # +=========================+ src_top
-            # | src (cleared)           |            |
-            # |------------------------ | dst_top    |
-            # | src (moved down) and dst|            |
-            # +-------------------------+ src_bot    |
-            # | dst (still in SR)       |            |
-            # |=========================| dst_bot    |
-            # | (clipped below SR)      |            v
-            # +-------------------------+
-            src_top, src_bot = top, bot + count
-            dst_top, dst_bot = top - count, bot
-            clr_top, clr_bot = src_top, dst_top
-        row, col = self.text.get_pos()
-        print(row,col)
-        #move_to = int(row) + count
-        #print(col, move_to)
-        #self.text.yview(move_to)
-        #self.text.see()
-        #if count == 1:
-        #    self.text.delete("%d.%d"%(row,0), "%d.%d"%(row+1,0))
-
-        #if count == -1:
-        #    self.text.delete("%d.%d"%(row,0), "%d.%d"%(row+1,0))
-
-        delta = dst_top - src_top
-        print(dst_top, dst_bot, left, right)
-        print(clr_top, clr_bot, left, right)
-        #self._cairo_surface.flush()
-        #self._cairo_context.save()
-        # The move is performed by setting the source surface to itself, but
-        # with a coordinate transformation.
-        #_, y = self._get_coords(dst_top - src_top, 0)
-        #self._cairo_context.set_source_surface(self._cairo_surface, 0, y)
-        # Clip to ensure only dst is affected by the change
-        #self._mask_region(dst_top, dst_bot, left, right)
-        # Do the move
-        #self._cairo_context.paint()
-        #self._cairo_context.restore()
-        # Clear the emptied region
-        #self._clear_region(clr_top, clr_bot, left, right+2)
         start, stop, step = self._screen.scroll(count)
-        #start += 1
-        #stop += 1
-        #print(self._screen._cells[0:3])
-        print(start, stop, step)
+
         self._nvim_cursor_goto(start, 0)
         for i, row in enumerate(self._screen._cells[start:stop:step]):
             for col in row:
                 self._nvim_put(col.text)
-            #print(start+i*step, row)
-            self._nvim_cursor_goto(start + i*step, 0)
-
+            self._nvim_cursor_goto((start+step) + i*step, 0)
         
 
 

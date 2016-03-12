@@ -179,8 +179,6 @@ class MixNvim():
         # also steal logic from gtk for faster updateing..
         self._screen = Screen(cols, rows)
 
-        #print('nv resize rows and cols are : ',str(rows),'.',str(cols))
-
         def resize():
             width = cols * self._colsize
             height = rows * self._rowsize
@@ -654,12 +652,13 @@ class NvimTk(MixNvim, MixTk):
         self.bind_resize()
 
         # The negative number makes it pixels instead of point sizes
-        self._fnormal = tkfont.Font(family='Monospace', size=13)
-        self._fbold = tkfont.Font(family='Monospace', weight='bold', size=13)
-        self._fitalic = tkfont.Font(family='Monospace', slant='italic', size=13)
+        self._fnormal = tkfont.Font(family='Monospace', size=12)
+        self._fbold = tkfont.Font(family='Monospace', weight='bold', size=12)
+        self._fitalic = tkfont.Font(family='Monospace', slant='italic', size=12)
         self._fbolditalic = tkfont.Font(family='Monospace', weight='bold',
-                                 slant='italic', size=13)
-        self._colsize = self._fnormal.measure('A')
+                                 slant='italic', size=12)
+        self.text.config(font=self._fnormal, wrap=tk.NONE)
+        self._colsize = self._fnormal.measure('M')
         self._rowsize = self._fnormal.metrics('linespace')
         
         text.tag_configure('red', background='red')

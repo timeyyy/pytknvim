@@ -23,7 +23,6 @@ class MockNvimText(NvimTk):
     Our Nvim capable tkinter text widget
     '''
 
-
     def thread_ui(self):
         '''starts our us threaded so we can run tests'''
         named_pipe = '/tmp/nvim{0}'.format(rand_str(16))
@@ -36,6 +35,7 @@ class MockNvimText(NvimTk):
 
         self.test_nvim = attach_headless(named_pipe)
         time.sleep(1)
+
 
 class VimCommands():
     '''
@@ -60,13 +60,17 @@ class VimCommands():
         self.v_normal_mode()
         self.send_tk_key('k')
 
+    def v_down(self):
+        self.v_normal_mode()
+        self.send_tk_key('j')
+
     def v_undo(self):
         self.v_normal_mode()
         self.send_tk_key('u')
 
     def v_page_down(self):
         self.v_normal_mode()
-        self.send_tk_key('g', modifyer='shift')
+        self.send_tk_key('G')
 
     def v_page_up(self):
         self.v_normal_mode()
@@ -98,13 +102,10 @@ class TestIntegration(VimCommands):
 
 
     def send_tk_key(self, *keys, modifyers=None):
-
-        if not modifyers:
-            modifyers = [None for i in range(len(keys))]
-        else:
-            assert len(keys) == len(modifyers)
-           
-        for key, mod in zip(keys, modifyers):
+        for key in keys:
+            mod = None
+            if type(key) in (tuple, list):
+                key, mod = key 
             send_tk_key(self.nvimtk, key, mod)
 
 
@@ -160,14 +161,17 @@ class TestIntegration(VimCommands):
 
 
     def test_scroll(self):
+        # Seems we cannot test scrolling because
+        # i havent figure out how to make the compare_screens
+        # track previous changes etc..
         self.v_insert_mode()
-        for i in range(0, 30):
-            self.send_tk_key('h')
+        for i in range(0, 20):
+            self.send_tk_key(rand_str(1))
             self.send_tk_key('Enter')
-
-        self.v_page_down()
         self.compare_screens()
         self.v_page_up()
+        self.compare_screens()
+        self.v_page_down()
         self.compare_screens()
 
         for i in range(0, 30):

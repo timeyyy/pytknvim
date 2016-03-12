@@ -60,6 +60,19 @@ class VimCommands():
         self.v_normal_mode()
         self.send_tk_key('k')
 
+    def v_undo(self):
+        self.v_normal_mode()
+        self.send_tk_key('u')
+
+    def v_page_down(self):
+        self.v_normal_mode()
+        self.send_tk_key('g', modifyer='shift')
+
+    def v_page_up(self):
+        self.v_normal_mode()
+        self.send_tk_key('g')
+        self.send_tk_key('g')
+
 
 class TestIntegration(VimCommands):
 
@@ -84,9 +97,15 @@ class TestIntegration(VimCommands):
         buf[:] = [""]
 
 
-    def send_tk_key(self, *keys):
-        for key in keys:
-            send_tk_key(self.nvimtk, key)
+    def send_tk_key(self, *keys, modifyers=None):
+
+        if not modifyers:
+            modifyers = [None for i in range(len(keys))]
+        else:
+            assert len(keys) == len(modifyers)
+           
+        for key, mod in zip(keys, modifyers):
+            send_tk_key(self.nvimtk, key, mod)
 
 
     def compare_screens(self):
@@ -136,7 +155,29 @@ class TestIntegration(VimCommands):
         self.v_up()
         self.v_delete_line()
         self.compare_screens()
-        import pdb;pdb.set_trace()
+        self.v_undo()
+        self.compare_screens()
+
+
+    def test_scroll(self):
+        self.v_insert_mode()
+        for i in range(0, 30):
+            self.send_tk_key('h')
+            self.send_tk_key('Enter')
+
+        self.v_page_down()
+        self.compare_screens()
+        self.v_page_up()
+        self.compare_screens()
+
+        for i in range(0, 30):
+            self.v_down()
+        self.compare_screens()
+
+        for i in range(0, 30):
+            self.v_up()
+        self.compare_screens()
+
 
 
 

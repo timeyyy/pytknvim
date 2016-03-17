@@ -35,6 +35,8 @@ class MockNvimText(NvimTk):
 
         self.test_nvim = attach_headless(named_pipe)
         time.sleep(1)
+        # Our compare_screen function doesn't work with number set
+        self.test_nvim.command("set nonumber")
 
 
 class VimCommands():

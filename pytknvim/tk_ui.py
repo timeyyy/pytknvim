@@ -93,6 +93,11 @@ class MixTk():
         if event.char == '8':
             self.text.tag_remove('blue', '1.0', 'end')
             self.text.tag_remove('red',"1.0", 'end')
+        if event.char == '7':
+            self.text.yview_scroll(-1,'units')
+        if event.char == '6':
+            self.text.yview_scroll(1,'units')
+            
         if event.char not in ('', ' '):
             #if not event.state:
             if event.keysym_num == ord(event.char):
@@ -212,6 +217,7 @@ class MixNvim():
 
     def _nvim_eol_clear(self):
         '''delete from index to end of line, fill with whitespace'''
+        print('EOLCLEAR')
         row, col = self._screen.row, self._screen.col
         # + 2 because the space and new line we add at the end
         self._clear_region(row+1, row+1, col, self._screen.right+2)
@@ -251,12 +257,17 @@ class MixNvim():
 
 
     def _nvim_set_scroll_region(self, top, bot, left, right):
+        print('set SCROLL REGION region from:{0} {1} {2} {3} to:{4} {5} {6} {7}'.format(
+            self._screen.top, self._screen.bot, self._screen.left, self._screen.right,
+            top, bot, left, right))
+
         self._screen.set_scroll_region(top, bot, left, right)
 
 
     def _nvim_scroll(self, count):
-        start, stop, step = self._screen.scroll(count)
-
+        print('SCROLL')
+        self.text.yview_scroll(count, 'units')
+        return
         self._nvim_cursor_goto(start, 0)
         for i, row in enumerate(self._screen._cells[start:stop:step]):
             for col in row:
@@ -542,6 +553,7 @@ class NvimTk(MixNvim, MixTk):
 
     def __init__(self):
         # we destroy this when the layout changes
+        self.start_time = time.time()
         self.toplevel = None
         # windows_id -> text widget map
         self.windows = None
@@ -596,6 +608,9 @@ class NvimTk(MixNvim, MixTk):
     def schedule_screen_update(self, apply_updates):
         '''This function is called from the bridge,
            apply_updates calls the required nvim actions'''
+        if time.time() - self.start_time > 1:
+            print()
+        self.start_time = time.time()
         def do():
             apply_updates()
             self._flush()

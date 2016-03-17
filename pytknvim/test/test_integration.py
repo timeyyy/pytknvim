@@ -25,6 +25,8 @@ class MockNvimText(NvimTk):
 
     def thread_ui(self):
         '''starts our us threaded so we can run tests'''
+        # Todo need to enforce a starting size so our
+        # scroll test will always check scrolling
         named_pipe = '/tmp/nvim{0}'.format(rand_str(16))
         nvim = attach_headless(named_pipe)
         if sys.version_info[0] > 2:
@@ -167,7 +169,7 @@ class TestIntegration(VimCommands):
         # i havent figure out how to make the compare_screens
         # track previous changes etc..
         self.v_insert_mode()
-        for i in range(0, 20):
+        for i in range(0, 30):
             self.send_tk_key(rand_str(1))
             self.send_tk_key('Enter')
         self.compare_screens()

@@ -110,7 +110,7 @@ def compare_screens(mock_inst):
     compares our internal screen with text widget
 
     nvim only makes the text (no spacing or newlines avaliable)
-    
+
     '''
     line_length = mock_inst._screen.columns
 
@@ -120,24 +120,21 @@ def compare_screens(mock_inst):
     
     parsed_text = _parse_text(text_rows, line_length)
     parsed_screen = _parse_screen(screen_rows, line_length)
-    import pdb;pdb.set_trace()
+    assert len(nvim_rows) == len(parsed_text)
     try:
         assert len(nvim_rows) == len(parsed_screen)
-        assert len(parsed_text) == len(parsed_screen)
     except AssertionError:
-        if len(parsed_text) >= line_length:
+        pass
+        #if len(parsed_screen) >= line_length:
             # After scrolling the text is deleted from
             # our widget and internal screen... so we cannot
             # compare zzz
-            diff = len(parsed_screen) - len(parsed_text)
-            parsed_text.extend([None for i in range(diff)])
-            parsed_screen.extend([None for i in range(diff)])
+        #    diff = len(parsed_screen) - len(parsed_text)
+        #    parsed_text.extend([None for i in range(diff)])
+        #    parsed_screen.extend([None for i in range(diff)])
 
-    for nr, tr, sr in zip(nvim_rows, parsed_text, screen_rows):
-        if sr is not None:
-            assert nr == sr
-        if tr is not None:
-            assert tr == sr
+    for nr, tr in zip(nvim_rows, parsed_text):
+        assert nr == tr
 
 
 class Event():

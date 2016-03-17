@@ -499,7 +499,7 @@ class MixNvim():
             self.text.insert(end, '\n')
         print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
         # Move the cursor 
-        self.text.mark_set(tk.INSERT, '{0}-1c'.format(end))
+        #self.text.mark_set(tk.INSERT, '{0}-1c'.format(end))
             #if not attrs:
                 #attrs = self._get_pango_attrs(None)
             #attrs = attrs[1] if cursor else attrs[0]

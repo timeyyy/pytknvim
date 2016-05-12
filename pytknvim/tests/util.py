@@ -87,7 +87,7 @@ def _parse(lines, line_length, eol_trim):
             if not parsed:
                 parsed = ''
         all_rows.append(parsed)
-    
+
     # Remove the status bar (screen has a new line padded after)..
     for i in range(1, 3):
         if '[No Name]' in all_rows[-i]:
@@ -117,7 +117,7 @@ def compare_screens(mock_inst):
     nvim_rows = _nvim_rows(mock_inst.test_nvim.buffers[0])
     text_rows = _textwidget_rows(mock_inst.text)
     screen_rows = _screen_rows(mock_inst._screen._cells)
-    
+
     parsed_text = _parse_text(text_rows, line_length)
     parsed_screen = _parse_screen(screen_rows, line_length)
     assert len(nvim_rows) == len(parsed_text)

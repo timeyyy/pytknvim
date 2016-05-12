@@ -34,12 +34,14 @@ def attach_socket(path=None):
 def attach_child():
     return attach('child', argv=['nvim', '--embed'])
 
-def attach_headless(path=None):
+def attach_headless(*nvim_args, path=None):
     if not path:
         path = '/tmp/nvim' + rand_str(8)
     os.environ['NVIM_LISTEN_ADDRESS'] = path
     dnull = open(os.devnull)
+    # TODO WHY USE SHLEX???
     cmd = shlex.split('nvim --headless')
+    cmd.extend(nvim_args)
     proc = Popen(cmd,
             stdin=dnull,
             stdout=dnull,

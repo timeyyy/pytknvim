@@ -14,7 +14,7 @@ from neovim.api import DecodeHook
 
 from pytknvim.tk_ui import NvimTk
 from pytknvim.util import attach_socket, attach_child, attach_headless
-from pytknvim.test.util import compare_screens, send_tk_key
+from pytknvim.tests.util import compare_screens, send_tk_key
 from pytknvim.util import rand_str
 
 class MockNvimText(NvimTk):
@@ -28,14 +28,14 @@ class MockNvimText(NvimTk):
         # Todo need to enforce a starting size so our
         # scroll test will always check scrolling
         named_pipe = '/tmp/nvim{0}'.format(rand_str(16))
-        nvim = attach_headless(named_pipe)
+        nvim = attach_headless('-u', 'NONE', path=named_pipe)
         if sys.version_info[0] > 2:
             nvim = nvim.with_hook(DecodeHook())
         ui = self
         self._bridge = UIBridge()
         thread.start_new_thread(self._bridge.connect, (nvim, ui) )
 
-        self.test_nvim = attach_headless(named_pipe)
+        self.test_nvim = attach_headless(path=named_pipe)
         time.sleep(1)
         # Our compare_screen function doesn't work with number set
         self.test_nvim.command("set nonumber")

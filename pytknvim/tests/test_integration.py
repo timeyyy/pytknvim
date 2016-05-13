@@ -157,7 +157,6 @@ class TestIntegration(VimCommands):
         self.send_tk_key('Enter')
         self.send_tk_key('t', 'h', 'r', 'e','e')
         self.compare_screens()
-        self.v_up()
         self.v_delete_line()
         self.compare_screens()
         self.v_undo()

@@ -102,7 +102,7 @@ class MixTk():
             #if not event.state:
             if event.keysym_num == ord(event.char):
                 # Send through normal keys
-                print('send normal key', event.char)
+                # print('send normal key', event.char)
                 self._bridge.input(event.char)
                 return
         if keysym in tk_modifiers:
@@ -113,7 +113,7 @@ class MixTk():
 
         # Translated so vim understands
         input_str = _stringify_key(KEY_TABLE.get(keysym, keysym), state)
-        print('sdenindg in a vim key', input_str)
+        # print('sdenindg in a vim key', input_str)
         self._bridge.input(input_str)
     
     def _tk_quit(self, *args):
@@ -131,7 +131,7 @@ class MixTk():
         self.current_cols = cols
         self.current_rows = rows
         self._bridge.resize(cols, rows)
-        print('resizing c, r, w, h', cols,rows, event.width, event.height)
+        # print('resizing c, r, w, h', cols,rows, event.width, event.height)
         #self.root.after_idle(lambda:self._bridge.resize(cols, rows))
         #time.sleep(1)
 
@@ -143,8 +143,8 @@ class MixTk():
         start = "%d.%d" % (top, left)
         end = "%d.%d" % (bot, right)
         self.text.delete(start, end)
-        print('from {0} to {1}'.format(start, end))
-        print(repr('clear {0}'.format(self.text.get(start, end))))
+        # print('from {0} to {1}'.format(start, end))
+        # print(repr('clear {0}'.format(self.text.get(start, end))))
 
     def bind_resize(self):
         '''
@@ -201,7 +201,7 @@ class MixNvim():
         '''
         wipe everyything, even the ~ and status bar
         '''
-        print('clear top {0} bot {1} left {2} right {3}'.format(self._screen.top, self._screen.bot+1, self._screen.left, self._screen.right+1))
+        # print('clear top {0} bot {1} left {2} right {3}'.format(self._screen.top, self._screen.bot+1, self._screen.left, self._screen.right+1))
         self._clear_region(self._screen.top+1, self._screen.bot + 2,
                            self._screen.left, self._screen.right+1)
         self._screen.clear()
@@ -217,7 +217,7 @@ class MixNvim():
 
     def _nvim_eol_clear(self):
         '''delete from index to end of line, fill with whitespace'''
-        print('EOLCLEAR')
+        # print('EOLCLEAR')
         row, col = self._screen.row, self._screen.col
         # + 2 because the space and new line we add at the end
         self._clear_region(row+1, row+1, col, self._screen.right+2)
@@ -257,15 +257,29 @@ class MixNvim():
 
 
     def _nvim_set_scroll_region(self, top, bot, left, right):
-        print('set SCROLL REGION region from:{0} {1} {2} {3} to:{4} {5} {6} {7}'.format(
-            self._screen.top, self._screen.bot, self._screen.left, self._screen.right,
-            top, bot, left, right))
+        # print('set SCROLL REGION region from:{0} {1} {2} {3} to:{4} {5} {6} {7}'.format(
+            # self._screen.top, self._screen.bot, self._screen.left, self._screen.right,
+            # top, bot, left, right))
 
         self._screen.set_scroll_region(top, bot, left, right)
 
 
     def _nvim_scroll(self, count):
         print('SCROLL')
+        self._screen.scroll(count)
+        print('SCROLL')
+        top, bot = self._screen.top, self._screen.bot
+        left, right = self._screen.left, self._screen.right
+        if count > 0:
+            print('poitive')
+            start = top
+            stop = bot - count + 1
+            step = 1
+        else:
+            print('negative')
+            start = bot
+            stop = top - count - 1
+            step = -1
         self.text.yview_scroll(count, 'units')
         return
         self._nvim_cursor_goto(start, 0)
@@ -277,7 +291,7 @@ class MixNvim():
 
 
     def _nvim_highlight_set(self, attrs):
-        print('highlight_set ', attrs)
+        # print('highlight_set ', attrs)
         # Apply attrs?
         if not attrs:
             return
@@ -294,7 +308,7 @@ class MixNvim():
         #print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
         if self._screen.row != self._pending[0]:
             # write to screen if vim puts stuff on  a new line
-            print('calling flush from put')
+            # print('calling flush from put')
             self._flush()
 
         self._screen.put(text, self._attrs)
@@ -345,7 +359,7 @@ class MixNvim():
         self.root.tk.call('wm', 'iconphoto', self.root._w, self._icon)
 
     def on_nvim_layout(self, arg):
-        print('NVIM LAYOUT')
+        # print('NVIM LAYOUT')
         windows = {}
         # Recursion helper to build a tk frame graph from data received with
         # the layout event
@@ -415,7 +429,7 @@ class MixNvim():
 
     def on_nvim_update_line(self, arg):
         widget = self.text 
-        pprint(arg)
+        # pprint(arg)
         contents = ''.join(map(lambda c: c['content'], arg['line']))
 
         row = self.text.index(tk.INSERT).split('.')[1]
@@ -468,7 +482,7 @@ class MixNvim():
         ccol = startcol
         buf = []
         bold = False
-        print('start row in flush is', row)
+        # print('start row in flush is', row)
         for _, col, text, attrs in self._screen.iter(row, row, startcol,
                                                      endcol - 1):
             newbold = attrs and 'bold' in attrs[0]
@@ -483,7 +497,8 @@ class MixNvim():
         if buf:
             self._draw(row, ccol, buf)
         else:
-            print('flush with no draw')
+            pass
+            # print('flush with no draw')
         #sys.exit()
 
 
@@ -508,7 +523,7 @@ class MixNvim():
                 self.text.delete(start, end)
                 self.text.insert(start, text)
             self.text.insert(end, '\n')
-        print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
+        # print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
         # Move the cursor 
         #self.text.mark_set(tk.INSERT, '{0}-1c'.format(end))
             #if not attrs:
@@ -608,9 +623,9 @@ class NvimTk(MixNvim, MixTk):
     def schedule_screen_update(self, apply_updates):
         '''This function is called from the bridge,
            apply_updates calls the required nvim actions'''
-        if time.time() - self.start_time > 1:
-            print()
-        self.start_time = time.time()
+        # if time.time() - self.start_time > 1:
+            # print()
+        # self.start_time = time.time()
         def do():
             apply_updates()
             self._flush()
@@ -652,7 +667,7 @@ def main(address=None):
             address = sys.argv[1]
             nvim = attach('socket', path=address)
         except:
-            print('embedding')
+            # print('embedding')
             nvim = attach('child', argv=['/usr/bin/nvim', '--embed'])
 
     ui = NvimFriendly()

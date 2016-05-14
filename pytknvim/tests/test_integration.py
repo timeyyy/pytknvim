@@ -168,9 +168,13 @@ class TestIntegration(VimCommands):
         # i havent figure out how to make the compare_screens
         # track previous changes etc..
         self.v_insert_mode()
-        for i in range(0, 30):
-            self.send_tk_key(rand_str(1))
+        for i in range(1, 25):
+            thing = rand_str(1)
+            self.send_tk_key(thing)
             self.send_tk_key('Enter')
+            if i > 21:
+                print('sleep ', thing)
+                time.sleep(1)
         self.compare_screens()
         self.v_page_up()
         self.compare_screens()

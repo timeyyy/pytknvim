@@ -9,7 +9,7 @@ from neovim import attach
 from neovim.ui.screen import Screen
 from tkquick.gui.tools import rate_limited, delay_call
 
-from pytknvim import tk_util
+from pytknvim import tk_util, scroll_util
 
 try:
     import Tkinter as tk
@@ -27,7 +27,7 @@ tk_modifiers = ('Alt_L', 'Alt_R',
                 'Control_L', 'Control_R',
                 'Shift_L', 'Shift_R',
                 'Win_L', 'Win_R')
-                
+
 KEY_TABLE = {
     'slash': '/',
     'backslash': '\\',
@@ -97,7 +97,7 @@ class MixTk():
             self.text.yview_scroll(-1,'units')
         if event.char == '6':
             self.text.yview_scroll(1,'units')
-            
+
         if event.char not in ('', ' '):
             #if not event.state:
             if event.keysym_num == ord(event.char):
@@ -115,11 +115,11 @@ class MixTk():
         input_str = _stringify_key(KEY_TABLE.get(keysym, keysym), state)
         # print('sdenindg in a vim key', input_str)
         self._bridge.input(input_str)
-    
+
     def _tk_quit(self, *args):
         self._bridge.exit()
 
-    
+
     def _tk_resize(self, event):
         '''Let Neovim know we are changing size'''
         if not self._screen:
@@ -159,7 +159,7 @@ class MixTk():
         widget size changes will not be passed along to nvim
         '''
         self.text.unbind('<Configure>', self._configure_id)
-        
+
 
 class MixNvim():
 
@@ -232,7 +232,8 @@ class MixNvim():
         # Tkinter row starts at 1 while col starts at 0
         #print('goto ','row ',str(row), ' col ', col)
         self._screen.cursor_goto(row, col)
-        self.text.mark_set(tk.INSERT, "{0}.{1}".format(row+1, col))
+        # TODO TRANSLATE THE BELOW MARK FROM SCREEN TO TKINTER POS
+        # self.text.mark_set(tk.INSERT, "{0}.{1}".format(row+1, col))
 
 
     def _nvim_busy_start(self):
@@ -267,27 +268,49 @@ class MixNvim():
     def _nvim_scroll(self, count):
         print('SCROLL')
         self._screen.scroll(count)
-        print('SCROLL')
-        top, bot = self._screen.top, self._screen.bot
-        left, right = self._screen.left, self._screen.right
+        right = self._screen.right
+        # bot =  self._screen.row
+        # print('Bot = ' + str(bot))
+        # Scroll down
+        # if count > 0:
+            # print('SCROLL DOWN TO END?')
+            # start = top
+            # stop = bot - count + 1
+            # step = 1
+        # Scroll up
+        # else:
+            # print('SCROLL UP TO BEGINNING?')
+            # start = bot
+            # stop = top - count - 1
+            # step = -1
+        tk_row, col = self.text.get_pos()
+        # Down
         if count > 0:
-            print('poitive')
-            start = top
-            stop = bot - count + 1
-            step = 1
+            print('scrolling down')
+            # Scrolling when text already inserted
+            if scroll_util.compare_row(self.text,
+                                       self._screen,
+                                       tk_row):
+                print('# Scrolling when text already inserted')
+                return
+            # Scrolling and inserting new text
+            else:
+                scroll_util.insert_screen_row(self.text,
+                                              self._screen,
+                                              tk_row,
+                                              right,
+                                              self._draw)
         else:
-            print('negative')
-            start = bot
-            stop = top - count - 1
-            step = -1
-        self.text.yview_scroll(count, 'units')
+            print('FUCKSCROLLING OTHER WAY WF')
+
+            # self._nvim_cursor_goto(bot, left)
+            # pad the rest with blank lines
         return
         self._nvim_cursor_goto(start, 0)
         for i, row in enumerate(self._screen._cells[start:stop:step]):
             for col in row:
                 self._nvim_put(col.text)
             self._nvim_cursor_goto((start+step) + i*step, 0)
-        
 
 
     def _nvim_highlight_set(self, attrs):
@@ -386,7 +409,7 @@ class MixNvim():
                 widget.pack(side=tk.LEFT, anchor=tk.NW)
             else:
                 widget.pack(side=tk.TOP, anchor=tk.NW)
-        
+
         # build the new toplevel frame
         toplevel = tk.Frame(self.root, takefocus=True)
         build_widget_graph(toplevel, arg)
@@ -516,12 +539,14 @@ class MixNvim():
                 end = start+'+{0}c'.format(len(text))
                 self.text.delete(start, end)
                 self.text.insert(start, text)
+                print('inserting into ', str(row))
         else:
             for text, attrs in data:
                 text = '\n{0} '.format(text)
                 end = start+'+{0}c'.format(len(text)+1)
                 self.text.delete(start, end)
                 self.text.insert(start, text)
+            print('inserting into ', str(row))
             self.text.insert(end, '\n')
         # print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
         # Move the cursor 
@@ -533,7 +558,7 @@ class MixNvim():
         #markup = ''.join(markup)
         #self._pango_layout.set_markup(markup, -1)
         # Draw the text
-        
+
         #if not cr:
             #cr = self._cairo_context
         #x, y = self._get_coords(row, col)
@@ -614,7 +639,7 @@ class NvimTk(MixNvim, MixTk):
         self.text.config(font=self._fnormal, wrap=tk.NONE)
         self._colsize = self._fnormal.measure('M')
         self._rowsize = self._fnormal.metrics('linespace')
-        
+
         text.tag_configure('red', background='red')
         text.tag_configure('blue', background='blue')
 
@@ -657,7 +682,6 @@ class NvimFriendly(NvimTk):
         elif mode == 'normal':
             self.text.config(cursor='hand2')
 
-        
 
 def main(address=None):
     if address:
@@ -683,4 +707,3 @@ def main(address=None):
 
 if __name__ == '__main__':
     main()
-        

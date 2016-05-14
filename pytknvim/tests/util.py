@@ -16,7 +16,7 @@ def _textwidget_rows(widget):
                         widget.index('end-1c').split('.'))
     try:
         for row in count(1):
-            line = [] 
+            line = []
             for col in count(0):
                 # Exit out
                 if end_row == row:
@@ -31,7 +31,7 @@ def _textwidget_rows(widget):
     except Unnest:
         pass
 
-           
+
 def _nvim_rows(buff):
     '''get all neovim rows'''
     all_rows = []
@@ -76,7 +76,7 @@ def _parse(lines, line_length, eol_trim):
             if eol_trim: parsed = line[1:-eol_trim].rstrip()
             else:
                 parsed = line[1:].rstrip()
-            if not parsed: 
+            if not parsed:
                 # do not add blank lists
                 continue
         else:
@@ -120,6 +120,7 @@ def compare_screens(mock_inst):
 
     parsed_text = _parse_text(text_rows, line_length)
     parsed_screen = _parse_screen(screen_rows, line_length)
+    import pdb; pdb.set_trace()
     assert len(nvim_rows) == len(parsed_text)
     try:
         assert len(nvim_rows) == len(parsed_screen)
@@ -153,9 +154,6 @@ class Event():
             self.keysym = modifyer.capitalize()
 
 
-
-
-
 def send_tk_key(tknvim, key, modifyer=None):
     '''
     send a key through to our class as a tkinter event
@@ -179,5 +177,3 @@ def send_tk_key(tknvim, key, modifyer=None):
         vimified = _stringify_key(key, [])
         tknvim._bridge.input(vimified)
     time.sleep(0.02)
-    
-    

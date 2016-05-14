@@ -8,7 +8,7 @@ class Text(tk.Text):
     def get_pos(self, mark=tk.INSERT):
         '''returns row and column as an int'''
         return (int(x) for x in self.index(mark).split('.'))
-   
+
     def highlight_pattern(self, pattern, tag, start="1.0", end="end",
                                      regexp=False):
        '''Apply the given tag to all text that matches the given pattern
@@ -32,4 +32,10 @@ class Text(tk.Text):
            self.mark_set("matchEnd", "%s+%sc" % (index, count.get()))
            self.tag_add(tag, "matchStart", "matchEnd")
 
-    #def 
+    def get_endcol(self, row):
+        '''
+        returns the index of the last char, not the newline char
+        '''
+        end_col = int(self.index(
+                                str(row)+'.end-1c').split('.')[1])
+        return end_col

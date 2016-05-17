@@ -1,5 +1,5 @@
 '''
-these should go into neovim python client
+some of these should go into neovim python client
 '''
 import os
 import time

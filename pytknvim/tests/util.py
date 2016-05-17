@@ -3,6 +3,7 @@ import time
 
 from pytknvim.tk_ui import KEY_TABLE, _stringify_key
 
+MAX_SCROLL = 10
 
 class Unnest(Exception):
     '''Used to exit a nested loop'''
@@ -36,7 +37,7 @@ def _nvim_rows(buff):
     '''get all neovim rows'''
     all_rows = []
     for row in buff:
-        all_rows.append(row.decode())
+        all_rows.append(row)
     return all_rows
 
 
@@ -57,7 +58,7 @@ def _parse(lines, line_length, eol_trim):
     also remove our newline chars and end spacing
     also remove status bar stuff
     '''
-    # Unfortunatley the corde is a bit confusing
+    # Unfortunatley the code is a bit confusing
     # I thought the handling was more similar than
     # different for the two cases...
     all_rows = []
@@ -104,6 +105,39 @@ def _parse_screen(lines, line_length):
     return _parse(lines, line_length, eol_trim=0)
 
 
+def _check_scrolled(screen, nvim_rows, parsed_thing):
+    '''
+    the screen and text widget only ever store
+    what is being showed to the user,
+    while neovim gives the entire buffer.
+
+    we try matching slices of the lists to check
+    if it has been scrolled
+    checks max 10 scrolls forward and 10 backward
+    '''
+    viewable = screen.bot - screen.top
+    for i in range(1, MAX_SCROLL + 1):
+        end_index = i + viewable
+        try:
+            # CHECK IF SCROLLED DOWN
+            assert nvim_rows[i:end_index] == parsed_thing
+        except AssertionError:
+            pass
+        else:
+            return True
+        try:
+            # CHECK IF SCROLLED UP
+            assert nvim_rows[-end_index:-i] == parsed_thing
+        except AssertionError:
+            pass
+        else:
+            return True
+    else:
+        raise AssertionError('nvim rows did not match..\n \
+                    make sure scroll amount is less than '
+                    + str(MAX_SCROLL))
+
+
 def compare_screens(mock_inst):
     '''
     compares our text widget values with the nvim values.
@@ -120,22 +154,26 @@ def compare_screens(mock_inst):
 
     parsed_text = _parse_text(text_rows, line_length)
     parsed_screen = _parse_screen(screen_rows, line_length)
-    import pdb; pdb.set_trace()
-    assert len(nvim_rows) == len(parsed_text)
+    try:
+        assert len(parsed_screen) == len(parsed_text)
+    except:
+        import pdb;pdb.set_trace()
     try:
         assert len(nvim_rows) == len(parsed_screen)
+    # A scroll may have happend
     except AssertionError:
-        pass
-        #if len(parsed_screen) >= line_length:
-            # After scrolling the text is deleted from
-            # our widget and internal screen... so we cannot
-            # compare zzz
-        #    diff = len(parsed_screen) - len(parsed_text)
-        #    parsed_text.extend([None for i in range(diff)])
-        #    parsed_screen.extend([None for i in range(diff)])
-
-    for nr, tr in zip(nvim_rows, parsed_text):
-        assert nr == tr
+        _check_scrolled(mock_inst._screen,
+                               nvim_rows,
+                               parsed_text)
+        # TODO move this inside _check_scrolled
+        # can use the offset to check all cells
+        for sr, tr in zip(parsed_screen, parsed_text):
+            assert sr == tr
+    else:
+        # No Scroll happened they should all match
+        for sr, tr, nr in zip(parsed_screen,
+                              parsed_text, nvim_rows):
+            assert sr == tr == nr
 
 
 class Event():

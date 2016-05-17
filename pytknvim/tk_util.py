@@ -5,7 +5,7 @@ class Text(tk.Text):
     def __init__(self, *args, **kwargs):
         tk.Text.__init__(self, *args, **kwargs)
 
-    def get_pos(self, mark=tk.INSERT):
+    def get_pos(self, row=None, col=None, mark=tk.INSERT):
         '''returns row and column as an int'''
         return (int(x) for x in self.index(mark).split('.'))
 

@@ -4,12 +4,12 @@ import math
 import time
 
 import neovim
-from neovim.ui.ui_bridge import UIBridge
+from neovim_gui.ui_bridge import UIBridge
 from neovim import attach
-from neovim.ui.screen import Screen
+from neovim_gui.screen import Screen
 from tkquick.gui.tools import rate_limited, delay_call
 
-from pytknvim import tk_util, scroll_util
+from pytknvim import tk_util
 
 try:
     import Tkinter as tk
@@ -85,18 +85,21 @@ class MixTk():
         #print(event.__dict__)
         keysym = event.keysym
         state = event.state
-        if event.char == '9':
-            self.text.tag_remove('blue', '1.0', 'end')
-            self.text.tag_remove('red',"1.0", 'end')
-            self.text.highlight_pattern('\n', 'blue')
-            self.text.highlight_pattern(' ', 'red')
-        if event.char == '8':
-            self.text.tag_remove('blue', '1.0', 'end')
-            self.text.tag_remove('red',"1.0", 'end')
-        if event.char == '7':
-            self.text.yview_scroll(-1,'units')
-        if event.char == '6':
-            self.text.yview_scroll(1,'units')
+        if event.char == 'a':
+            print()
+            print(self.text.get("1.0", "end"))
+            print()
+            # self.text.tag_remove('blue', '1.0', 'end')
+            # self.text.tag_remove('red',"1.0", 'end')
+            # self.text.highlight_pattern('\n', 'blue')
+            # self.text.highlight_pattern(' ', 'red')
+        # if event.char == '8':
+            # self.text.tag_remove('blue', '1.0', 'end')
+            # self.text.tag_remove('red',"1.0", 'end')
+        # if event.char == '7':
+            # self.text.yview_scroll(-1,'units')
+        # if event.char == '6':
+            # self.text.yview_scroll(1,'units')
 
         if event.char not in ('', ' '):
             #if not event.state:
@@ -217,7 +220,7 @@ class MixNvim():
 
     def _nvim_eol_clear(self):
         '''delete from index to end of line, fill with whitespace'''
-        # print('EOLCLEAR')
+        print('EOLCLEAR')
         row, col = self._screen.row, self._screen.col
         # + 2 because the space and new line we add at the end
         self._clear_region(row+1, row+1, col, self._screen.right+2)
@@ -229,11 +232,11 @@ class MixNvim():
 
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
-        # Tkinter row starts at 1 while col starts at 0
-        #print('goto ','row ',str(row), ' col ', col)
+        print('Moving cursor ', row,' ', col)
         self._screen.cursor_goto(row, col)
-        # TODO TRANSLATE THE BELOW MARK FROM SCREEN TO TKINTER POS
-        # self.text.mark_set(tk.INSERT, "{0}.{1}".format(row+1, col))
+        self.text.mark_set(tk.INSERT, "{0}.{1}".
+                                        format(row, col))
+        self.text.see(tk.INSERT)
 
 
     def _nvim_busy_start(self):
@@ -258,59 +261,42 @@ class MixNvim():
 
 
     def _nvim_set_scroll_region(self, top, bot, left, right):
-        # print('set SCROLL REGION region from:{0} {1} {2} {3} to:{4} {5} {6} {7}'.format(
-            # self._screen.top, self._screen.bot, self._screen.left, self._screen.right,
-            # top, bot, left, right))
-
         self._screen.set_scroll_region(top, bot, left, right)
 
 
     def _nvim_scroll(self, count):
-        print('SCROLL')
+        self._flush()
         self._screen.scroll(count)
-        right = self._screen.right
-        # bot =  self._screen.row
-        # print('Bot = ' + str(bot))
-        # Scroll down
-        # if count > 0:
-            # print('SCROLL DOWN TO END?')
-            # start = top
-            # stop = bot - count + 1
-            # step = 1
-        # Scroll up
-        # else:
-            # print('SCROLL UP TO BEGINNING?')
-            # start = bot
-            # stop = top - count - 1
-            # step = -1
-        tk_row, col = self.text.get_pos()
+        right = self._screen.right + 1
+        bot = self._screen.bot + 1
+        tk_top_start = "1.0"
+        tk_top_end = "1.end+1c"
+        tk_bot_start = "{}.0".format(bot)
+        tk_bot_end = "{}.end+1c".format(bot)
         # Down
         if count > 0:
-            print('scrolling down')
-            # Scrolling when text already inserted
-            if scroll_util.compare_row(self.text,
-                                       self._screen,
-                                       tk_row):
-                print('# Scrolling when text already inserted')
-                return
-            # Scrolling and inserting new text
-            else:
-                scroll_util.insert_screen_row(self.text,
-                                              self._screen,
-                                              tk_row,
-                                              right,
-                                              self._draw)
+            print("SCROLL DOWN")
+            # DELETE TOP LINE
+            # print('Deleting from 1.0\n', repr(self.text.get(tk_begin, "1.end+1c")))
+            self.text.delete(tk_top_start, tk_top_end)
+            self.text.insert(tk_bot_start, " " * right + ' \n')
+            # print('inserting spaces and newline at ' + tk_bot)
+            # src_top, src_bot = top + count, bot
+            # dst_top, dst_bot = top, bot - count
+            # clr_top, clr_bot = dst_bot, src_bot
+        # Up
         else:
-            print('FUCKSCROLLING OTHER WAY WF')
+            print("SCROLL UP")
+            print('Deleting from {}\n'.format(tk_bot_start),
+                    repr(self.text.get(
+                        tk_bot_start, tk_bot_end)))
+            # DELETE BOT LINE
+            self.text.delete(tk_bot_start, tk_bot_end)
+            # INSERT AT TOP
+            self.text.insert(tk_top_start, " " * right + ' \n')
+            print('inserting spaces and newline at ' + tk_top_start)
 
-            # self._nvim_cursor_goto(bot, left)
-            # pad the rest with blank lines
-        return
-        self._nvim_cursor_goto(start, 0)
-        for i, row in enumerate(self._screen._cells[start:stop:step]):
-            for col in row:
-                self._nvim_put(col.text)
-            self._nvim_cursor_goto((start+step) + i*step, 0)
+        self.text.yview_scroll(count, 'units')
 
 
     def _nvim_highlight_set(self, attrs):
@@ -328,10 +314,10 @@ class MixNvim():
         put a charachter into position, we only write the lines
         when a new row is being edited
         '''
-        #print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
+        print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
         if self._screen.row != self._pending[0]:
             # write to screen if vim puts stuff on  a new line
-            # print('calling flush from put')
+            print('calling flush from put')
             self._flush()
 
         self._screen.put(text, self._attrs)
@@ -535,21 +521,19 @@ class MixNvim():
         if self.text.get(start) != '\n':
             # Todo,.. don't really get how this can return more than 1 value if the lines are operational..
             for text, attrs in data:
-                text = '{0} '.format(text) 
+                text = '{0} '.format(text)
                 end = start+'+{0}c'.format(len(text))
                 self.text.delete(start, end)
                 self.text.insert(start, text)
-                print('inserting into ', str(row))
         else:
             for text, attrs in data:
                 text = '\n{0} '.format(text)
                 end = start+'+{0}c'.format(len(text)+1)
                 self.text.delete(start, end)
                 self.text.insert(start, text)
-            print('inserting into ', str(row))
             self.text.insert(end, '\n')
-        # print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
-        # Move the cursor 
+        print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
+        # Move the cursor
         #self.text.mark_set(tk.INSERT, '{0}-1c'.format(end))
             #if not attrs:
                 #attrs = self._get_pango_attrs(None)
@@ -665,7 +649,6 @@ class NvimFriendly(NvimTk):
     atm im just using it to keep the config code seperate'''
 
     def __init__(self):
-
         super().__init__()
 
     def _nvim_mode_change(self, mode):
@@ -691,17 +674,13 @@ def main(address=None):
             address = sys.argv[1]
             nvim = attach('socket', path=address)
         except:
-            # print('embedding')
-            nvim = attach('child', argv=['/usr/bin/nvim', '--embed'])
+            # nvim = util.attach_headless('-u', 
+            nvim = attach('child', argv=['/usr/bin/nvim', '--embed', '-u', 'NONE'])
+
 
     ui = NvimFriendly()
-
-    if sys.version_info[0] > 2:
-        from neovim.api import DecodeHook
-        nvim = nvim.with_hook(DecodeHook())
     bridge = UIBridge()
     bridge.connect(nvim, ui)
-    #_thread.start_new_thread(bridge.connect, (nvim, ui) )
     if len(sys.argv) > 1:
         nvim.command('edit ' + sys.argv[1])
 

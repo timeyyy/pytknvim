@@ -82,30 +82,12 @@ class MixTk():
 
 
     def _tk_key(self,event, **k):
-        #print(event.__dict__)
         keysym = event.keysym
         state = event.state
-        if event.char == 'a':
-            print()
-            print(self.text.get("1.0", "end"))
-            print()
-            # self.text.tag_remove('blue', '1.0', 'end')
-            # self.text.tag_remove('red',"1.0", 'end')
-            # self.text.highlight_pattern('\n', 'blue')
-            # self.text.highlight_pattern(' ', 'red')
-        # if event.char == '8':
-            # self.text.tag_remove('blue', '1.0', 'end')
-            # self.text.tag_remove('red',"1.0", 'end')
-        # if event.char == '7':
-            # self.text.yview_scroll(-1,'units')
-        # if event.char == '6':
-            # self.text.yview_scroll(1,'units')
 
         if event.char not in ('', ' '):
-            #if not event.state:
             if event.keysym_num == ord(event.char):
                 # Send through normal keys
-                # print('send normal key', event.char)
                 self._bridge.input(event.char)
                 return
         if keysym in tk_modifiers:
@@ -116,8 +98,8 @@ class MixTk():
 
         # Translated so vim understands
         input_str = _stringify_key(KEY_TABLE.get(keysym, keysym), state)
-        # print('sdenindg in a vim key', input_str)
         self._bridge.input(input_str)
+
 
     def _tk_quit(self, *args):
         self._bridge.exit()
@@ -138,6 +120,7 @@ class MixTk():
         #self.root.after_idle(lambda:self._bridge.resize(cols, rows))
         #time.sleep(1)
 
+
     def _clear_region(self, top, bot, left, right):
         '''
         Delete from top left to bottom right from the ui widget
@@ -149,12 +132,14 @@ class MixTk():
         # print('from {0} to {1}'.format(start, end))
         # print(repr('clear {0}'.format(self.text.get(start, end))))
 
+
     def bind_resize(self):
         '''
         after calling,
         widget changes will now be passed along to neovim
         '''
         self._configure_id = self.text.bind('<Configure>', self._tk_resize)
+
 
     def unbind_resize(self):
         '''
@@ -171,13 +156,13 @@ class MixNvim():
 
     @delay_call(0.1)
     def _delayed_update(self):
-        '''
-        update will be postponed by the above seconds each
-        time the function gets called
-        '''
+        # update will be postponed by the above seconds each
+        # time the function gets called
         self.unbind_resize()
-        self.text.master.update_idletasks()# REALLY SLOWS THINGS DOWN...
+        # REALLY SLOWS THINGS DOWN...
+        self.text.master.update_idletasks()
         self.bind_resize()
+
 
     def _nvim_resize(self, cols, rows):
         '''Let neovim update tkinter when neovim changes size'''
@@ -213,9 +198,6 @@ class MixNvim():
         for col in range(self._screen.columns):
             self.text.insert('1.{0}'.format(col), ' ')
         self.text.insert('1.{0}'.format(self._screen.columns+1), ' \n')
-            #self._nvim_put(' ')
-        #self._flush()
-        return
 
 
     def _nvim_eol_clear(self):
@@ -275,38 +257,18 @@ class MixNvim():
         tk_bot_end = "{}.end+1c".format(bot)
         # Down
         if count > 0:
-            print("SCROLL DOWN")
-            # DELETE TOP LINE
-            # print('Deleting from 1.0\n', repr(self.text.get(tk_begin, "1.end+1c")))
             self.text.delete(tk_top_start, tk_top_end)
             self.text.insert(tk_bot_start, " " * right + ' \n')
-            # print('inserting spaces and newline at ' + tk_bot)
-            # src_top, src_bot = top + count, bot
-            # dst_top, dst_bot = top, bot - count
-            # clr_top, clr_bot = dst_bot, src_bot
         # Up
         else:
-            print("SCROLL UP")
-            print('Deleting from {}\n'.format(tk_bot_start),
-                    repr(self.text.get(
-                        tk_bot_start, tk_bot_end)))
-            # DELETE BOT LINE
             self.text.delete(tk_bot_start, tk_bot_end)
-            # INSERT AT TOP
             self.text.insert(tk_top_start, " " * right + ' \n')
-            print('inserting spaces and newline at ' + tk_top_start)
 
         self.text.yview_scroll(count, 'units')
 
 
     def _nvim_highlight_set(self, attrs):
-        # print('highlight_set ', attrs)
-        # Apply attrs?
-        if not attrs:
-            return
-        #key = tuple(sorted((k, v) for k, v in (attrs or {}).items()))
-        #print(attrs)
-        #self.on_nvim_update_line(attrs)
+        pass
 
 
     def _nvim_put(self, text):
@@ -323,20 +285,6 @@ class MixNvim():
         self._screen.put(text, self._attrs)
         self._pending[1] = min(self._screen.col - 1, self._pending[1])
         self._pending[2] = max(self._screen.col, self._pending[2])
-        #font = self._fnormal
-        #if self._attrs.get('bold', False):
-            #font = self._fbold
-        #if self._attrs.get('italic', False):
-            #jfont = self._fbolditalic if font == self._fbold else self._fitalic
-        # colors
-        #fg = "#{0:0{1}}".format(self._attrs.get('foreground', self._fg), 6)
-        #bg = "#{0:0{1}}".format(self._attrs.get('background', self._bg), 6)
-        # Update internal screen
-        #return
-        #if not self._insert_cursor:
-            #status bar text???
-            #print('throwing away ->', text)
-            #return
 
 
     def _nvim_bell(self):
@@ -367,91 +315,6 @@ class MixNvim():
         self._icon = tk.PhotoImage(file=icon)
         self.root.tk.call('wm', 'iconphoto', self.root._w, self._icon)
 
-    def on_nvim_layout(self, arg):
-        # print('NVIM LAYOUT')
-        windows = {}
-        # Recursion helper to build a tk frame graph from data received with
-        # the layout event
-        def build_widget_graph(parent, node, arrange='row'):
-            widget = None
-            if node['type'] in ['row', 'column']:
-                widget = tk.Frame(parent)
-            else:
-                widget = tk.Text(parent, width=node['width'],
-                              height=node['height'], state='normal',
-                              font=self.font, exportselection=False,
-                              fg=self.fg_color, bg=self.bg_color,
-                              wrap='none', undo=False)
-                setattr(widget, 'added_tags', {})
-                # fill the widget one linefeed per row to simplify updating
-                widget.insert('1.0', '\n' * node['height'])
-                # We don't want the user to edit
-                widget['state'] = 'disabled'
-                windows[node['window_id']] = widget
-            if 'children' in node:
-                for child in node['children']:
-                    build_widget_graph(widget, child, arrange=node['type'])
-            if arrange == 'row':
-                widget.pack(side=tk.LEFT, anchor=tk.NW)
-            else:
-                widget.pack(side=tk.TOP, anchor=tk.NW)
-
-        # build the new toplevel frame
-        toplevel = tk.Frame(self.root, takefocus=True)
-        build_widget_graph(toplevel, arg)
-        # destroy the existing one if exists
-        if self.toplevel:
-            self.toplevel.destroy()
-        self.windows = windows
-        self.toplevel = toplevel
-        self.toplevel.pack()
-
-
-    def on_nvim_delete_line(self, arg):
-        widget = self.windows[arg['window_id']]
-        line = arg['row'] + 1
-        count = arg['count']
-        startpos = '%d.0' % line
-        endpos = '%d.0' % (line + count)
-        widget['state'] = 'normal'
-        # delete
-        widget.delete(startpos, endpos)
-        # insert at the end(they will be updated soon
-        widget.insert('end', '\n' * count)
-        widget['state'] = 'disabled'
-
-    def on_nvim_win_end(self, arg):
-        widget = self.windows[arg['window_id']]
-        line = arg['row'] + 1
-        endline = arg['endrow'] + 1
-        marker = arg['marker']
-        fill = arg['fill']
-        startpos = '%d.0' % line
-        endpos = '%d.0' % endline
-        widget['state'] = 'normal'
-        # delete
-        widget.delete(startpos, endpos)
-        line_fill = '%s%s\n' % (marker, fill * (widget['width'] - 1))
-        # insert markers/fillers
-        widget.insert('end', line_fill * (endline - line))
-        widget['state'] = 'disabled'
-
-    def on_nvim_update_line(self, arg):
-        widget = self.text 
-        # pprint(arg)
-        contents = ''.join(map(lambda c: c['content'], arg['line']))
-
-        row = self.text.index(tk.INSERT).split('.')[1]
-        startpos = '%d.0' % int(row) + 1
-        endpos = '%d.end' % line
-        #widget['state'] = 'normal'
-        widget.delete(startpos, endpos)
-        widget.insert(startpos, contents)
-        #widget['state'] = 'disabled'
-        if 'attributes' in arg:
-            for name, positions in arg['attributes'].items():
-                for position in positions:
-                    self.apply_attribute(widget, name, line, position)
 
     def apply_attribute(self, widget, name, line, position):
         # Ensure the attribute name is associated with a tag configured with
@@ -512,8 +375,7 @@ class MixNvim():
 
 
     def _draw(self, row, col, data, cr=None, cursor=False):
-       # markup = []
-        # Tkinter row starts at 1
+        # markup = []
         row = row + 1
         # The space is required otherwise the curosr goes onto a new line
         # The new line is required because the first char of a line is the \n
@@ -533,27 +395,6 @@ class MixNvim():
                 self.text.insert(start, text)
             self.text.insert(end, '\n')
         print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
-        # Move the cursor
-        #self.text.mark_set(tk.INSERT, '{0}-1c'.format(end))
-            #if not attrs:
-                #attrs = self._get_pango_attrs(None)
-            #attrs = attrs[1] if cursor else attrs[0]
-            #markup.append('<span {0}>{1}</span>'.format(attrs, text))
-        #markup = ''.join(markup)
-        #self._pango_layout.set_markup(markup, -1)
-        # Draw the text
-
-        #if not cr:
-            #cr = self._cairo_context
-        #x, y = self._get_coords(row, col)
-        #if cursor and self._insert_cursor:
-            #cr.rectangle(x, y, self._cell_pixel_width / 4,
-                         #self._cell_pixel_height)
-            #cr.clip()
-        #cr.move_to(x, y)
-        #PangoCairo.update_layout(cr, self._pango_layout)
-        #PangoCairo.show_layout(cr, self._pango_layout)
-        #_, r = self._pango_layout.get_pixel_extents()
 
 
     def on_nvim_exit(self, arg):
@@ -674,7 +515,6 @@ def main(address=None):
             address = sys.argv[1]
             nvim = attach('socket', path=address)
         except:
-            # nvim = util.attach_headless('-u', 
             nvim = attach('child', argv=['/usr/bin/nvim', '--embed', '-u', 'NONE'])
 
 

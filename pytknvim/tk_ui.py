@@ -1,3 +1,12 @@
+'''
+Implements a UI for neovim  using tkinter.
+
+* The widget has lines updated/deleted so that any
+  given time it only contains what is being displayed.
+
+* The widget is filled with spaces to simplify moving
+  the cursor around
+'''
 import sys
 import math
 import time
@@ -114,10 +123,11 @@ class MixTk():
     def _clear_region(self, top, bot, left, right):
         '''
         Delete from top left to bottom right from the ui widget
+        give screen coordinates in
         '''
         self._flush()
-        start = "%d.%d" % (top, left)
-        end = "%d.%d" % (bot, right)
+        start = "%d.%d" % (top+1, left)
+        end = "%d.%d" % (bot+1, right+1)
         self.text.delete(start, end)
         # print('from {0} to {1}'.format(start, end))
         # print(repr('clear {0}'.format(self.text.get(start, end))))
@@ -137,6 +147,78 @@ class MixTk():
         widget size changes will not be passed along to nvim
         '''
         self.text.unbind('<Configure>', self._configure_id)
+
+
+    def tk_update_line(self, screen_row, contents):
+        line = screen_row + 1
+        start = "%d.1" % line
+        end = "%d.%d" % (line, len(contents)+1)
+        self.text.delete(start, end)
+        self.text.insert(start, contents)
+                # text = '\n{0} '.format(text)
+                # end = start+'+{0}c'.format(len(text)+1)
+                # self.text.delete(start, end)
+                # self.text.insert(start, text)
+        # keep_cursor_on_row
+        # self.text.insert(start+'+%dc'%len(contents), ' ')
+
+    def _get_row(self, screen_row):
+        '''change a screen row to a tkinter row,
+        defaults to screen.row'''
+        if not screen_row:
+            screen_row = self._screen.row
+        return screen_row + 1
+
+    def _get_col(self, screen_col):
+        '''change a screen col to a tkinter row,
+        defaults to screen.col'''
+        if not screen_col:
+            screen_col = self._screen.col
+        return screen_col
+
+
+    def tk_delete_line(self, screen_col=None, screen_row=None,
+                                       del_eol=False, count=1):
+        '''
+        To specifiy where to start the delete from
+        screen_col (defualts to screen.row)
+        screen_row (defaults to screen.col)
+
+        To delete the eol char aswell
+        del_eol (defaults to False)
+
+        count is the number of lines to delete
+        '''
+        line = self._get_row(screen_row)
+        col = self._get_col(screen_col)
+        start = "%d.%d" % (line, col)
+        if del_eol:
+            end = "%d.0" % (line + count)
+        else:
+            end = "%d.end" % (line + count - 1)
+        # print('DELETEING FROM ', repr(self.text.get(start,end)))
+        self.text.delete(start, end)
+
+
+    def tk_insert_line(self, count=1, screen_row=None):
+        line = self._get_row(screen_row)
+        start = "%d.0" % line
+        end = "%d.end" % line
+        self.text.insert(start, count * '\n')
+        #TODO WTF
+        self.text.delete('end - %d lines' % count, 'end')
+
+    def tk_pad_line(self, col=0, add_eol=None, screen_row=None):
+        '''
+        add required blank spaces at the end of the line
+        '''
+        line = self._get_row(screen_row)
+        start = "%d.%d" % (line, col)
+        # + 1 because \n bumps cursor onto new line..
+        contents = " " * (1 + self.current_cols - col)
+        if add_eol:
+            contents += '\n'
+        self.text.insert(start, contents)
 
 
 class MixNvim():
@@ -180,34 +262,31 @@ class MixNvim():
         wipe everyything, even the ~ and status bar
         '''
         # print('clear top {0} bot {1} left {2} right {3}'.format(self._screen.top, self._screen.bot+1, self._screen.left, self._screen.right+1))
-        self._clear_region(self._screen.top+1, self._screen.bot + 2,
-                           self._screen.left, self._screen.right+1)
         self._screen.clear()
 
+        self.tk_delete_line(del_eol=True,
+                            count=self.current_rows)
+
         # nvim fills all lines with spaces besides the first...
-        for col in range(self._screen.columns):
-            self.text.insert('1.{0}'.format(col), ' ')
-        self.text.insert('1.{0}'.format(self._screen.columns+1), ' \n')
+        self.tk_pad_line(self._screen.col, add_eol=True)
 
 
     def _nvim_eol_clear(self):
         '''delete from index to end of line, fill with whitespace'''
         print('EOLCLEAR')
-        row, col = self._screen.row, self._screen.col
-        # + 2 because the space and new line we add at the end
-        self._clear_region(row+1, row+1, col, self._screen.right+2)
         self._screen.eol_clear()
-        # + 1 because of the empty space at the end
-        self.text.insert("%d.%d"%(row+1, col), "".join(" " for i in range(1 + self.current_cols - col)))
-        self.text.mark_set(tk.INSERT, "{0}.{1}".format(row+1, col))
+        self.tk_delete_line()
+        self.tk_pad_line(self._screen.col)
+        # self.text.mark_set(tk.INSERT, "{0}.{1}".format(
+            # self._screen.row+1, self._screen.col))
 
 
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
-        print('Moving cursor ', row,' ', col)
+        # print('Moving cursor ', row,' ', col)
         self._screen.cursor_goto(row, col)
         self.text.mark_set(tk.INSERT, "{0}.{1}".
-                                        format(row, col))
+                                        format(row+1, col))
         self.text.see(tk.INSERT)
 
 
@@ -312,10 +391,10 @@ class MixNvim():
         put a charachter into position, we only write the lines
         when a new row is being edited
         '''
-        print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
+        # print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
         if self._screen.row != self._pending[0]:
             # write to screen if vim puts stuff on  a new line
-            print('calling flush from put')
+            # print('calling flush from put')
             self._flush()
 
         self._screen.put(text, self._attrs)
@@ -432,7 +511,7 @@ class MixNvim():
                 self.text.delete(start, end)
                 self.text.insert(start, text)
             self.text.insert(end, '\n')
-        print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
+        # print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
 
 
     def on_nvim_exit(self, arg):

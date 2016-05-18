@@ -1,5 +1,4 @@
 import sys
-from pprint import pprint
 import math
 import time
 
@@ -9,6 +8,8 @@ from neovim import attach
 from neovim_gui.screen import Screen
 from tkquick.gui.tools import rate_limited, delay_call
 
+from pytknvim.util import _stringify_key, _stringify_color
+from pytknvim.util import _split_color, _invert_color
 from pytknvim import tk_util
 
 try:
@@ -62,17 +63,6 @@ KEY_TABLE = {
     'Enter': 'CR',
 }
 
-def _stringify_key(key, state):
-    send = []
-    if state:
-        if 'Shift' in key:
-            send.append('S')
-        elif 'Ctrl' in key:
-            send.append('C')
-        elif 'Alt' in key:
-            send.append('A')
-    send.append(key)
-    return '<' + '-'.join(send) + '>'
 
 class MixTk():
     '''Tkinter actions we bind and use to communicate to neovim'''
@@ -268,7 +258,53 @@ class MixNvim():
 
 
     def _nvim_highlight_set(self, attrs):
-        pass
+        # print('ATTRS', attrs)
+        self._attrs = self._get_tk_attrs(attrs)
+
+
+    def _reset_attrs_cache(self):
+        self._tk_text_cache = {}
+        self._tk_attrs_cache = {}
+
+
+    def _get_tk_attrs(self, attrs):
+        key = tuple(sorted((k, v,) for k, v in (attrs or {}).items()))
+        rv = self._tk_attrs_cache.get(key, None)
+        if rv is None:
+            fg = self._foreground if self._foreground != -1 else 0
+            bg = self._background if self._background != -1 else 0xffffff
+            n = {'foreground': _split_color(fg),
+                'background': _split_color(bg),}
+            if attrs:
+                # make sure that foreground and background are assigned first
+                for k in ['foreground', 'background']:
+                    if k in attrs:
+                        n[k] = _split_color(attrs[k])
+                for k, v in attrs.items():
+                    if k == 'reverse':
+                        n['foreground'], n['background'] = \
+                            n['background'], n['foreground']
+                    elif k == 'italic':
+                        n['font_style'] = 'italic'
+                    elif k == 'bold':
+                        n['font_weight'] = 'bold'
+                        # TODO
+                        # if self._bold_spacing:
+                            # n['letter_spacing'] = str(self._bold_spacing)
+                    elif k == 'underline':
+                        n['underline'] = 'solid'
+            c = dict(n)
+            c['foreground'] = _invert_color(*_split_color(fg))
+            c['background'] = _invert_color(*_split_color(bg))
+            c['foreground'] = _stringify_color(*c['foreground'])
+            c['background'] = _stringify_color(*c['background'])
+            n['foreground'] = _stringify_color(*n['foreground'])
+            n['background'] = _stringify_color(*n['background'])
+            n = ' '.join(['{0}="{1}"'.format(k, v) for k, v in n.items()])
+            c = ' '.join(['{0}="{1}"'.format(k, v) for k, v in c.items()])
+            rv = (n, c,)
+            self._tk_attrs_cache[key] = rv
+        return rv
 
 
     def _nvim_put(self, text):
@@ -295,12 +331,14 @@ class MixNvim():
         pass
 
 
-    def _nvim_update_fg(self, arg):
-        self.fg_color = arg
+    def _nvim_update_fg(self, fg):
+        self._foreground = fg
+        self._reset_attrs_cache()
 
 
-    def _nvim_update_bg(self, arg):
-        self.bg_color = arg
+    def _nvim_update_bg(self, bg):
+        self._background = bg
+        self._reset_attrs_cache()
 
 
     def _nvim_update_suspend(self, arg):
@@ -419,18 +457,13 @@ class NvimTk(MixNvim, MixTk):
     def __init__(self):
         # we destroy this when the layout changes
         self.start_time = time.time()
-        self.toplevel = None
-        # windows_id -> text widget map
-        self.windows = None
-        # pending nvim events
-        self.nvim_events = deque()
         self._insert_cursor = False
-        self._attrs = {}
-        self._pending = []
         self._screen = None
-        self._fg = '#000000'
-        self._bg = '#ffffff'
+        self._foreground = -1
+        self._background = -1
         self._pending = [0,0,0]
+        self._attrs = {}
+        self._reset_attrs_cache()
 
     def start(self, bridge):
         # MAXIMUM COLS AND ROWS AVALIABLE (UNTIL WE RESIZE THEN THIS CHANGES)

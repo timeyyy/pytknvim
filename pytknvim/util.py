@@ -64,3 +64,28 @@ def rand_str(length):
     for i in range(length):
         chars.append(random.choice(string.ascii_letters))
     return ''.join(char for char in chars)
+
+
+def _stringify_key(key, state):
+    send = []
+    if state:
+        if 'Shift' in key:
+            send.append('S')
+        elif 'Ctrl' in key:
+            send.append('C')
+        elif 'Alt' in key:
+            send.append('A')
+    send.append(key)
+    return '<' + '-'.join(send) + '>'
+
+
+def _split_color(n):
+    return ((n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff,)
+
+
+def _invert_color(r, g, b):
+    return (255 - r, 255 - g, 255 - b,)
+
+
+def _stringify_color(r, g, b):
+    return '#{0:0{1}x}'.format((r << 16) + (g << 8) + b, 6)

@@ -8,6 +8,7 @@ from threading import Thread
 import shlex
 import string
 import random
+from functools import wraps
 
 from neovim import attach
 
@@ -89,3 +90,25 @@ def _invert_color(r, g, b):
 
 def _stringify_color(r, g, b):
     return '#{0:0{1}x}'.format((r << 16) + (g << 8) + b, 6)
+
+
+def debug_echo(func):
+    '''used on method to simply print the function name and
+    parameters if self.debug_echo = True,
+    the function will not execute'''
+    @wraps(func)
+    def deco(*args, **kwargs):
+        try:
+            debug = args[0].debug_echo
+        except AttributeError:
+            debug = False
+        if debug:
+            if len(args) == 1:
+                to_print = []
+            else:
+                to_print = args[1:]
+            print(func.__name__, repr(to_print), **kwargs)
+
+        return func(*args, **kwargs)
+    return deco
+

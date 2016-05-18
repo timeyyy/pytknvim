@@ -19,6 +19,7 @@ from tkquick.gui.tools import rate_limited, delay_call
 
 from pytknvim.util import _stringify_key, _stringify_color
 from pytknvim.util import _split_color, _invert_color
+from pytknvim.util import debug_echo
 from pytknvim import tk_util
 
 try:
@@ -149,30 +150,39 @@ class MixTk():
         self.text.unbind('<Configure>', self._configure_id)
 
 
-    def tk_update_line(self, screen_row, contents):
+    # TODO Do some performance testing,
+    # to much insert/deletes slows down tkinter
+    # right now all the padding inserts gets down on resize
+    # is updating entire line in one insert better or
+    # 2 inserts, one at the front and one at the end?
+    def tk_update_line(self, screen_row, contents,
+            keep_begin_eol=True, append_eol=False):
         line = screen_row + 1
-        start = "%d.1" % line
-        end = "%d.%d" % (line, len(contents)+1)
-        self.text.delete(start, end)
+        if keep_begin_eol:
+            col = 1
+        else:
+            col =  0
+        start = "%d.%d" % (line, col)
+        # end = "%d.%d" % (line, len(contents))
+        # self.text.delete(start, end)
+        self.tk_delete_line(screen_row=screen_row,
+                            del_eol=False)
         self.text.insert(start, contents)
-                # text = '\n{0} '.format(text)
-                # end = start+'+{0}c'.format(len(text)+1)
-                # self.text.delete(start, end)
-                # self.text.insert(start, text)
-        # keep_cursor_on_row
-        # self.text.insert(start+'+%dc'%len(contents), ' ')
+        self.tk_pad_line(screen_col=len(contents),
+                        add_eol=True,
+                        screen_row=screen_row)
 
     def _get_row(self, screen_row):
         '''change a screen row to a tkinter row,
         defaults to screen.row'''
-        if not screen_row:
+        if screen_row is None:
             screen_row = self._screen.row
         return screen_row + 1
 
     def _get_col(self, screen_col):
         '''change a screen col to a tkinter row,
         defaults to screen.col'''
-        if not screen_col:
+        if screen_col is None:
             screen_col = self._screen.col
         return screen_col
 
@@ -196,7 +206,7 @@ class MixTk():
             end = "%d.0" % (line + count)
         else:
             end = "%d.end" % (line + count - 1)
-        # print('DELETEING FROM ', repr(self.text.get(start,end)))
+        print('DELETEING FROM ',start, ' ',end, ' ', repr(self.text.get(start,end)))
         self.text.delete(start, end)
 
 
@@ -208,13 +218,17 @@ class MixTk():
         #TODO WTF
         self.text.delete('end - %d lines' % count, 'end')
 
-    def tk_pad_line(self, col=0, add_eol=None, screen_row=None):
+    def tk_pad_line(self, screen_col=None, add_eol=None,
+                                            screen_row=None):
         '''
         add required blank spaces at the end of the line
         '''
         line = self._get_row(screen_row)
+        col = self._get_col(screen_col)
         start = "%d.%d" % (line, col)
-        # + 1 because \n bumps cursor onto new line..
+        print('padding from ', start)
+        # + 1 spaces to keep cursor on same line..
+        # TODO a bug in the cursor movement
         contents = " " * (1 + self.current_cols - col)
         if add_eol:
             contents += '\n'
@@ -235,7 +249,7 @@ class MixNvim():
         self.text.master.update_idletasks()
         self.bind_resize()
 
-
+    @debug_echo
     def _nvim_resize(self, cols, rows):
         '''Let neovim update tkinter when neovim changes size'''
         #Todo Check all the heights and so on are correct, :)
@@ -257,6 +271,7 @@ class MixNvim():
         #self.root.after_idle(self._delayed_nvim_resize, width, height)
 
 
+    @debug_echo
     def _nvim_clear(self):
         '''
         wipe everyything, even the ~ and status bar
@@ -271,16 +286,21 @@ class MixNvim():
         self.tk_pad_line(self._screen.col, add_eol=True)
 
 
+    @debug_echo
     def _nvim_eol_clear(self):
-        '''delete from index to end of line, fill with whitespace'''
-        print('EOLCLEAR')
+        '''
+        delete from index to end of line,
+        fill with whitespace
+        leave eol intact
+        '''
         self._screen.eol_clear()
-        self.tk_delete_line()
-        self.tk_pad_line(self._screen.col)
+        self.tk_delete_line(del_eol=False)
+        self.tk_pad_line(screen_col=self._screen.col)
         # self.text.mark_set(tk.INSERT, "{0}.{1}".format(
-            # self._screen.row+1, self._screen.col))
+                        # self._screen.row+1, self._screen.col))
 
 
+    @debug_echo
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
         # print('Moving cursor ', row,' ', col)
@@ -311,16 +331,20 @@ class MixNvim():
         self._insert_cursor = mode == 'insert'
 
 
+    @debug_echo
     def _nvim_set_scroll_region(self, top, bot, left, right):
         self._screen.set_scroll_region(top, bot, left, right)
 
 
+    @debug_echo
     def _nvim_scroll(self, count):
+        assert abs(count) == 1
         self._flush()
         self._screen.scroll(count)
         right = self._screen.right + 1
         bot = self._screen.bot + 1
-        tk_top_start = "1.0"
+        cur = self._screen.row + 1
+        tk_top_start = "%d.0" % cur
         tk_top_end = "1.end+1c"
         tk_bot_start = "{}.0".format(bot)
         tk_bot_end = "{}.end+1c".format(bot)
@@ -330,17 +354,25 @@ class MixNvim():
             self.text.insert(tk_bot_start, " " * right + ' \n')
         # Up
         else:
-            self.text.delete(tk_bot_start, tk_bot_end)
-            self.text.insert(tk_top_start, " " * right + ' \n')
+            self.tk_delete_line(screen_row=self._screen.bot,
+                                screen_col=0,
+                                del_eol=True)
+            print('PADDING LINE ', self._screen.top )
+            self.tk_pad_line(screen_row=self._screen.top,
+                             screen_col=0,
+                             add_eol=True)
+            # self.text.insert(tk_top_start, " " * right + ' \n')
 
         self.text.yview_scroll(count, 'units')
 
 
+    @debug_echo
     def _nvim_highlight_set(self, attrs):
         # print('ATTRS', attrs)
         self._attrs = self._get_tk_attrs(attrs)
 
 
+    @debug_echo
     def _reset_attrs_cache(self):
         self._tk_text_cache = {}
         self._tk_attrs_cache = {}
@@ -386,6 +418,7 @@ class MixNvim():
         return rv
 
 
+    @debug_echo
     def _nvim_put(self, text):
         '''
         put a charachter into position, we only write the lines
@@ -493,6 +526,19 @@ class MixNvim():
 
     def _draw(self, row, col, data, cr=None, cursor=False):
         # markup = []
+
+
+        # Don't get why tarruda used a for loop
+        assert len(data) == 1
+        # text, attrs = data[0]
+        # if row == 0:
+            # self.tk_update_line(row, text,
+                                # keep_begin_eol=False,)
+        # else:
+            # self.tk_update_line(row, text,
+                                # keep_begin_eol=True)
+
+        # return
         row = row + 1
         # The space is required otherwise the curosr goes onto a new line
         # The new line is required because the first char of a line is the \n
@@ -500,6 +546,8 @@ class MixNvim():
         if self.text.get(start) != '\n':
             # Todo,.. don't really get how this can return more than 1 value if the lines are operational..
             for text, attrs in data:
+                # self.tk_update_line(row, text,
+                                # keep_begin_eol=True,)
                 text = '{0} '.format(text)
                 end = start+'+{0}c'.format(len(text))
                 self.text.delete(start, end)
@@ -550,6 +598,7 @@ class NvimTk(MixNvim, MixTk):
         self.current_rows = 24
         bridge.attach(self.current_cols, self.current_rows, True)
         self._bridge = bridge
+        self.debug_echo = True
 
         self.root = tk.Tk()
         self.root.protocol('WM_DELETE_WINDOW', self._tk_quit)
@@ -610,7 +659,7 @@ class NvimFriendly(NvimTk):
                         insertontime=600,
                         insertofftime=150,
                         insertbackground='#21F221',
-                        insertborderwidth=0) 
+                        insertborderwidth=0)
         super()._nvim_mode_change(mode)
         if mode  == 'insert':
             pass
@@ -627,9 +676,10 @@ def main(address=None):
             address = sys.argv[1]
             nvim = attach('socket', path=address)
         except:
-            nvim = attach('child', argv=['/usr/bin/nvim', '--embed', '-u', 'NONE'])
-
-
+            nvim = attach('child', argv=['/usr/bin/nvim',
+                                        '--embed',
+                                        '-u',
+                                        'NONE'])
     ui = NvimFriendly()
     bridge = UIBridge()
     bridge.connect(nvim, ui)

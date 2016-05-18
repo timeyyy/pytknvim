@@ -115,10 +115,12 @@ class TestIntegration(VimCommands):
         compare_screens(self.nvimtk)
 
 
+    @pytest.mark.simple
     def test_load(self):
         self.compare_screens()
 
 
+    @pytest.mark.simple
     def test_basic_insert(self):
         self.v_insert_mode()
         self.compare_screens()
@@ -128,6 +130,7 @@ class TestIntegration(VimCommands):
         self.compare_screens()
 
 
+    @pytest.mark.simple
     def test_enter_key(self):
         self.v_insert_mode()
         self.send_tk_key('b', 'c', 'd', 'e')
@@ -143,6 +146,7 @@ class TestIntegration(VimCommands):
         self.compare_screens()
 
 
+    @pytest.mark.simple
     def test_delete_line(self):
         self.v_insert_mode()
         self.send_tk_key('o', 'n', 'e')
@@ -174,6 +178,11 @@ class TestIntegration(VimCommands):
         self.send_tk_key('O')
         self.send_tk_key('2')
         self.compare_screens()
+        # The end state of this tests should be
+        # 1
+        # 2
+        # 
+        # 3
 
 
     def test_scroll(self):
@@ -204,6 +213,7 @@ class TestIntegration(VimCommands):
                 break
 
 
+    @pytest.mark.failing
     def test_page_up_down(self):
         def _do(to_top):
             self.compare_screens()

@@ -94,6 +94,8 @@ def _parse(lines, line_length, eol_trim):
         if '[No Name]' in all_rows[-i]:
             del all_rows[-i:]
             break
+    else:
+        raise Exception("couldn't find status bar...")
     return all_rows
 
 

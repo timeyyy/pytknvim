@@ -172,12 +172,14 @@ class MixTk():
                         add_eol=True,
                         screen_row=screen_row)
 
+
     def _get_row(self, screen_row):
         '''change a screen row to a tkinter row,
         defaults to screen.row'''
         if screen_row is None:
             screen_row = self._screen.row
         return screen_row + 1
+
 
     def _get_col(self, screen_col):
         '''change a screen col to a tkinter row,
@@ -206,8 +208,10 @@ class MixTk():
             end = "%d.0" % (line + count)
         else:
             end = "%d.end" % (line + count - 1)
-        print('DELETEING FROM ',start, ' ',end, ' ', repr(self.text.get(start,end)))
         self.text.delete(start, end)
+        gotten = self.text.get(start, end)
+        print('deleted  from ' + start + ' to end ' +end)
+        print('deleted '+repr(gotten))
 
 
     def tk_insert_line(self, count=1, screen_row=None):
@@ -218,21 +222,24 @@ class MixTk():
         #TODO WTF
         self.text.delete('end - %d lines' % count, 'end')
 
+
     def tk_pad_line(self, screen_col=None, add_eol=None,
-                                            screen_row=None):
+                                    screen_row=None, count=1):
         '''
         add required blank spaces at the end of the line
         '''
         line = self._get_row(screen_row)
         col = self._get_col(screen_col)
-        start = "%d.%d" % (line, col)
-        print('padding from ', start)
-        # + 1 spaces to keep cursor on same line..
-        # TODO a bug in the cursor movement
-        contents = " " * (1 + self.current_cols - col)
-        if add_eol:
-            contents += '\n'
-        self.text.insert(start, contents)
+        for n in range(0, count):
+            start = "%d.%d" % (line + n, col)
+            # + 1 spaces to keep cursor on same line..
+            # TODO a bug in the cursor movement
+            contents = " " * (1 + self.current_cols - col)
+            if add_eol:
+                contents += '\n'
+            print('padding from ', start, ' with %d: ' % len(contents))
+            print(repr(contents))
+            self.text.insert(start, contents)
 
 
 class MixNvim():
@@ -338,32 +345,30 @@ class MixNvim():
 
     @debug_echo
     def _nvim_scroll(self, count):
-        assert abs(count) == 1
         self._flush()
         self._screen.scroll(count)
-        right = self._screen.right + 1
-        bot = self._screen.bot + 1
-        cur = self._screen.row + 1
-        tk_top_start = "%d.0" % cur
-        tk_top_end = "1.end+1c"
-        tk_bot_start = "{}.0".format(bot)
-        tk_bot_end = "{}.end+1c".format(bot)
+        abs_count = abs(count)
+        # The minus 1 is because we want our tk_* functions
+        # to operate on the row passed in
+        delta = abs_count - 1
         # Down
         if count > 0:
-            self.text.delete(tk_top_start, tk_top_end)
-            self.text.insert(tk_bot_start, " " * right + ' \n')
+            delete_row = self._screen.top
+            pad_row = self._screen.bot - delta
         # Up
         else:
-            self.tk_delete_line(screen_row=self._screen.bot,
-                                screen_col=0,
-                                del_eol=True)
-            print('PADDING LINE ', self._screen.top )
-            self.tk_pad_line(screen_row=self._screen.top,
-                             screen_col=0,
-                             add_eol=True)
-            # self.text.insert(tk_top_start, " " * right + ' \n')
+            delete_row = self._screen.bot - delta
+            pad_row = self._screen.top
 
-        self.text.yview_scroll(count, 'units')
+        self.tk_delete_line(screen_row=delete_row,
+                            screen_col=0,
+                            del_eol=True,
+                            count=abs_count)
+        self.tk_pad_line(screen_row=pad_row,
+                         screen_col=0,
+                         add_eol=True,
+                         count=abs_count)
+        # self.text.yview_scroll(count, 'units')
 
 
     @debug_echo
@@ -418,7 +423,7 @@ class MixNvim():
         return rv
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_put(self, text):
         '''
         put a charachter into position, we only write the lines

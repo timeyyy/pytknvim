@@ -1,22 +1,24 @@
 '''
-Neovim ui api is likely to change, also i do not understand really how and what it tries to do, it feels very granular and clunky. Makes it hard to do unit testing. Focuising on Integration testing...
+Neovim ui api is likely to change,
+also i do not understand really how and what it tries to do,
+it feels very granular and clunky.
+Makes it hard to do unit testing.
+Focuising on Integration testing...
 '''
 
-import os
-import sys
 import time
 import _thread as thread
-from subprocess import Popen, PIPE
 from itertools import count
 
 import pytest
 from neovim_gui.ui_bridge import UIBridge
 
 from pytknvim.tk_ui import NvimTk
-from pytknvim.util import attach_socket, attach_child, attach_headless
+from pytknvim.util import attach_headless
 from pytknvim.tests.util import compare_screens, send_tk_key
 from pytknvim.util import rand_str
 from pytknvim.tests.util import MAX_SCROLL
+
 
 class MockNvimText(NvimTk):
 
@@ -31,11 +33,13 @@ class MockNvimText(NvimTk):
         nvim = attach_headless('-u', 'NONE', path=named_pipe)
         ui = self
         self._bridge = UIBridge()
-        thread.start_new_thread(self._bridge.connect, (nvim, ui) )
+        thread.start_new_thread(self._bridge.connect,
+                                (nvim, ui))
 
         self.test_nvim = attach_headless(path=named_pipe)
         time.sleep(2)
-        # Our compare_screen function doesn't work with number set
+    # TODO
+    # Our compare_screen function doesn't work with number set
         self.test_nvim.command("set nonumber")
 
 
@@ -157,7 +161,7 @@ class TestIntegration(VimCommands):
         self.send_tk_key('Enter')
         self.send_tk_key('t', 'w', 'o')
         self.send_tk_key('Enter')
-        self.send_tk_key('t', 'h', 'r', 'e','e')
+        self.send_tk_key('t', 'h', 'r', 'e', 'e')
         self.compare_screens()
         self.v_delete_line()
         self.compare_screens()
@@ -181,7 +185,7 @@ class TestIntegration(VimCommands):
         # The end state of this tests should be
         # 1
         # 2
-        # 
+        #
         # 3
 
 
@@ -213,14 +217,11 @@ class TestIntegration(VimCommands):
                 break
 
 
-    @pytest.mark.failing
     def test_page_up_down(self):
         def _do(to_top):
             self.compare_screens()
-            print('PAGE UP')
             self.v_page_up()
             self.compare_screens()
-            print('PAGE DOWN')
             self.v_page_down()
             self.compare_screens()
 
@@ -239,7 +240,3 @@ class TestIntegration(VimCommands):
                 _do(to_top)
             if scrolled == MAX_SCROLL:
                 break
-
-
-
-

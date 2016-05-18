@@ -161,8 +161,23 @@ class TestIntegration(VimCommands):
         self.compare_screens()
 
 
+    def test_o_and_shift_o(self):
+        self.v_insert_mode()
+        self.send_tk_key('1')
+        self.v_normal_mode()
+        # Open onto new line
+        self.send_tk_key('o')
+        self.send_tk_key('3')
+        self.compare_screens()
+        self.v_normal_mode()
+        #  Open onto previous line
+        self.send_tk_key('O')
+        self.send_tk_key('2')
+        self.compare_screens()
+
+
     def test_scroll(self):
-        # Force a scroll of a certain amount then compare_screens
+        # Force a scroll of an amount then compare_screens
         def _do(to_top):
             self.compare_screens()
             for i in range(0, to_top):

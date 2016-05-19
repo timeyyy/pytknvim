@@ -6,6 +6,7 @@ Makes it hard to do unit testing.
 Focuising on Integration testing...
 '''
 
+import os
 import time
 import _thread as thread
 from itertools import count
@@ -16,8 +17,11 @@ from neovim_gui.ui_bridge import UIBridge
 from pytknvim.tk_ui import NvimTk
 from pytknvim.util import attach_headless
 from pytknvim.tests.util import compare_screens, send_tk_key
+from pytknvim.tests.util import STATUS_BAR_HEIGHT
 from pytknvim.util import rand_str
-from pytknvim.tests.util import MAX_SCROLL
+
+
+MAX_SCROLL = 10
 
 
 class MockNvimText(NvimTk):
@@ -38,9 +42,7 @@ class MockNvimText(NvimTk):
 
         self.test_nvim = attach_headless(path=named_pipe)
         time.sleep(2)
-    # TODO
-    # Our compare_screen function doesn't work with number set
-        self.test_nvim.command("set nonumber")
+        self.max_scroll = MAX_SCROLL
 
 
 class VimCommands():
@@ -83,6 +85,11 @@ class VimCommands():
         self.send_tk_key('g')
         self.send_tk_key('g')
 
+    def v_jump(self, pos):
+        self.v_normal_mode()
+        self.send_tk_key(*"{}G".format(pos))
+        self.send_tk_key('Enter')
+
 
 class TestIntegration(VimCommands):
 
@@ -92,6 +99,10 @@ class TestIntegration(VimCommands):
         cls.nvimtk.thread_ui()
         # This one has to be used because of threads and locks
         cls.nvim = cls.nvimtk.test_nvim
+    # TODO
+    # Our compare_screen function doesn't work with number set
+        cls.nvim.command("set nonumber")
+        cls.nvim.command("set noswapfile")
 
     def teardown_class(cls):
         # Have to figure out how to teardown properlly
@@ -201,19 +212,21 @@ class TestIntegration(VimCommands):
             self.compare_screens()
 
         # TODO GET THIS DYNAMICALLY
-        status_bar_height = 3
+        STATUS_BAR_HEIGHT = 3
         for i in count(1):
             self.v_page_down()
             self.v_insert_mode()
             scrolled = i\
                        - self.nvimtk.current_rows\
-                       + status_bar_height
+                       + STATUS_BAR_HEIGHT
             self.send_tk_key(*str(i-1))
             self.send_tk_key('Enter')
-            if scrolled in (1, 2, MAX_SCROLL):
+
+            self.nvimtk.max_scroll = 50
+            if scrolled in (1, 2, self.nvimtk.max_scroll):
                 to_top = self.nvimtk.current_rows + scrolled
                 _do(to_top)
-            if scrolled == MAX_SCROLL:
+            if scrolled == self.nvimtk.max_scroll:
                 break
 
 
@@ -225,18 +238,48 @@ class TestIntegration(VimCommands):
             self.v_page_down()
             self.compare_screens()
 
-        # TODO GET THIS DYNAMICALLY
-        status_bar_height = 3
         for i in count(1):
             self.v_page_down()
             self.v_insert_mode()
             scrolled = i\
                        - self.nvimtk.current_rows\
-                       + status_bar_height
+                       + STATUS_BAR_HEIGHT
             self.send_tk_key(*str(i-1))
             self.send_tk_key('Enter')
-            if scrolled in (1 , 2, MAX_SCROLL):
+
+            # Make sure our last jump covers an entire page
+            last_scroll = old_scroll = self.nvimtk.max_scroll
+            if last_scroll < self.nvimtk.current_rows:
+                last_scroll = self.nvimtk.current_rows + 1
+                self.nvimtk.max_scroll = last_scroll
+
+            if scrolled in (1, 2, last_scroll):
                 to_top = self.nvimtk.current_rows + scrolled
+                time.sleep(1)
                 _do(to_top)
-            if scrolled == MAX_SCROLL:
+            if scrolled == last_scroll:
+                self.nvimtk.max_scroll = old_scroll
                 break
+
+
+    def test_big_file(self):
+        '''
+        doesn't test anything that our other tests doesn't,
+        but just paves the way for testing a file
+        '''
+        test_file = 'weakref'
+        self.v_normal_mode()
+        self.send_tk_key(*':e! '+test_file)
+        self.send_tk_key('Enter')
+        # Give time for actions to take place
+        time.sleep(0.5)
+        # TODO READ LEN OF FILE
+        old_max = self.nvimtk.max_scroll
+        self.nvimtk.max_scroll = 500
+        self.v_page_down()
+        time.sleep(0.5)
+        self.compare_screens()
+        self.v_page_up()
+        time.sleep(0.5)
+        self.compare_screens()
+        self.max_sroll = old_max

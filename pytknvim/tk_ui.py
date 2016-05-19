@@ -150,29 +150,6 @@ class MixTk():
         self.text.unbind('<Configure>', self._configure_id)
 
 
-    # TODO Do some performance testing,
-    # to much insert/deletes slows down tkinter
-    # right now all the padding inserts gets down on resize
-    # is updating entire line in one insert better or
-    # 2 inserts, one at the front and one at the end?
-    def tk_update_line(self, screen_row, contents,
-            keep_begin_eol=True, append_eol=False):
-        line = screen_row + 1
-        if keep_begin_eol:
-            col = 1
-        else:
-            col =  0
-        start = "%d.%d" % (line, col)
-        # end = "%d.%d" % (line, len(contents))
-        # self.text.delete(start, end)
-        self.tk_delete_line(screen_row=screen_row,
-                            del_eol=False)
-        self.text.insert(start, contents)
-        self.tk_pad_line(screen_col=len(contents),
-                        add_eol=True,
-                        screen_row=screen_row)
-
-
     def _get_row(self, screen_row):
         '''change a screen row to a tkinter row,
         defaults to screen.row'''
@@ -210,23 +187,17 @@ class MixTk():
             end = "%d.end" % (line + count - 1)
         self.text.delete(start, end)
         gotten = self.text.get(start, end)
-        print('deleted  from ' + start + ' to end ' +end)
-        print('deleted '+repr(gotten))
+        if self.debug_echo == True:
+            print('deleted  from ' + start + ' to end ' +end)
+            print('deleted '+repr(gotten))
 
 
-    def tk_insert_line(self, count=1, screen_row=None):
-        line = self._get_row(screen_row)
-        start = "%d.0" % line
-        end = "%d.end" % line
-        self.text.insert(start, count * '\n')
-        #TODO WTF
-        self.text.delete('end - %d lines' % count, 'end')
-
-
-    def tk_pad_line(self, screen_col=None, add_eol=None,
+    def tk_pad_line(self, screen_col=None, add_eol=False,
                                     screen_row=None, count=1):
         '''
         add required blank spaces at the end of the line
+        can apply action to multiple rows py passing a count
+        in
         '''
         line = self._get_row(screen_row)
         col = self._get_col(screen_col)
@@ -234,12 +205,19 @@ class MixTk():
             start = "%d.%d" % (line + n, col)
             # + 1 spaces to keep cursor on same line..
             # TODO a bug in the cursor movement
-            contents = " " * (1 + self.current_cols - col)
+            spaces = " " * (1 + self.current_cols - col)
+            if not spaces:
+                import pdb;pdb.set_trace()
             if add_eol:
-                contents += '\n'
-            print('padding from ', start, ' with %d: ' % len(contents))
-            print(repr(contents))
-            self.text.insert(start, contents)
+                if not spaces:
+                    spaces = ' \n'
+                else:
+                    spaces += '\n'
+            if self.debug_echo:
+                print('padding from ', start, ' with %d: '
+                                                % len(spaces))
+                print(repr(spaces))
+            self.text.insert(start, spaces)
 
 
 class MixNvim():
@@ -283,14 +261,17 @@ class MixNvim():
         '''
         wipe everyything, even the ~ and status bar
         '''
-        # print('clear top {0} bot {1} left {2} right {3}'.format(self._screen.top, self._screen.bot+1, self._screen.left, self._screen.right+1))
         self._screen.clear()
 
         self.tk_delete_line(del_eol=True,
+                            screen_row=0,
+                            screen_col=0,
                             count=self.current_rows)
-
-        # nvim fills all lines with spaces besides the first...
-        self.tk_pad_line(self._screen.col, add_eol=True)
+        # Add spaces everywhere
+        self.tk_pad_line(screen_row=0,
+                         screen_col=0,
+                         count=self.current_rows,
+                         add_eol=True,)
 
 
     @debug_echo
@@ -302,7 +283,8 @@ class MixNvim():
         '''
         self._screen.eol_clear()
         self.tk_delete_line(del_eol=False)
-        self.tk_pad_line(screen_col=self._screen.col)
+        self.tk_pad_line(screen_col=self._screen.col,
+                         add_eol=False)
         # self.text.mark_set(tk.INSERT, "{0}.{1}".format(
                         # self._screen.row+1, self._screen.col))
 
@@ -343,7 +325,6 @@ class MixNvim():
         self._screen.set_scroll_region(top, bot, left, right)
 
 
-    @debug_echo
     def _nvim_scroll(self, count):
         self._flush()
         self._screen.scroll(count)
@@ -377,7 +358,6 @@ class MixNvim():
         self._attrs = self._get_tk_attrs(attrs)
 
 
-    @debug_echo
     def _reset_attrs_cache(self):
         self._tk_text_cache = {}
         self._tk_attrs_cache = {}
@@ -423,7 +403,7 @@ class MixNvim():
         return rv
 
 
-    # @debug_echo
+    @debug_echo
     def _nvim_put(self, text):
         '''
         put a charachter into position, we only write the lines
@@ -432,7 +412,7 @@ class MixNvim():
         # print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
         if self._screen.row != self._pending[0]:
             # write to screen if vim puts stuff on  a new line
-            # print('calling flush from put')
+            print('calling flush from put')
             self._flush()
 
         self._screen.put(text, self._attrs)
@@ -468,7 +448,8 @@ class MixNvim():
 
     def _nvim_set_icon(self, icon):
         self._icon = tk.PhotoImage(file=icon)
-        self.root.tk.call('wm', 'iconphoto', self.root._w, self._icon)
+        self.root.tk.call('wm', 'iconphoto',
+                          self.root._w, self._icon)
 
 
     def apply_attribute(self, widget, name, line, position):
@@ -530,44 +511,18 @@ class MixNvim():
 
 
     def _draw(self, row, col, data, cr=None, cursor=False):
-        # markup = []
-
-
-        # Don't get why tarruda used a for loop
+        '''
+        updates a line :)
+        '''
         assert len(data) == 1
-        # text, attrs = data[0]
-        # if row == 0:
-            # self.tk_update_line(row, text,
-                                # keep_begin_eol=False,)
-        # else:
-            # self.tk_update_line(row, text,
-                                # keep_begin_eol=True)
+        text, attrs = data[0]
 
-        # return
-        row = row + 1
-        # The space is required otherwise the curosr goes onto a new line
-        # The new line is required because the first char of a line is the \n
-        start = "{0}.{1}".format(row, col)
-        if self.text.get(start) != '\n':
-            # Todo,.. don't really get how this can return more than 1 value if the lines are operational..
-            for text, attrs in data:
-                # self.tk_update_line(row, text,
-                                # keep_begin_eol=True,)
-                text = '{0} '.format(text)
-                end = start+'+{0}c'.format(len(text))
-                self.text.delete(start, end)
-                self.text.insert(start, text)
-        else:
-            for text, attrs in data:
-                text = '\n{0} '.format(text)
-                end = start+'+{0}c'.format(len(text)+1)
-                self.text.delete(start, end)
-                self.text.insert(start, text)
-            self.text.insert(end, '\n')
-        # print('replacing ',repr(self.text.get(start, end)), 'with', repr(text), start, end)
+        start = "{}.{}".format(row+1, col)
+        end = start+'+{0}c'.format(len(text))
+        self.text.replace(start, end, text)
 
 
-    def on_nvim_exit(self, arg):
+    def _nvim_exit(self, arg):
         self.root.destroy()
 
 

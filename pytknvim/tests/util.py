@@ -3,7 +3,9 @@ import time
 
 from pytknvim.tk_ui import KEY_TABLE, _stringify_key
 
-MAX_SCROLL = 10
+# TODO GET THIS DYNAMICALLY
+STATUS_BAR_HEIGHT = 3
+
 
 class Unnest(Exception):
     '''Used to exit a nested loop'''
@@ -50,7 +52,7 @@ def _screen_rows(cells):
         yield ''.join(i for i in line)
 
 
-def _parse(lines, line_length, eol_trim):
+def _parse(lines, line_length, mock_inst, eol_trim):
     '''
     make the values for screen and tkinter text widget
     look like neovims values,
@@ -61,6 +63,7 @@ def _parse(lines, line_length, eol_trim):
     # Unfortunatley the code is a bit confusing
     # I thought the handling was more similar than
     # different for the two cases...
+    file_name =  mock_inst.test_nvim.eval('expand("%")')
     all_rows = []
     for i, line in enumerate(lines):
         # screen doesn't have a \n
@@ -69,7 +72,7 @@ def _parse(lines, line_length, eol_trim):
         try:
             assert len(line)-eol_trim  == line_length
         except AssertionError:
-            # Todo does this line length need to match?
+            # TODO does this line length need to match?
             if '-- INSERT --' not in line:
                 raise
             break
@@ -89,25 +92,29 @@ def _parse(lines, line_length, eol_trim):
                 parsed = ''
         all_rows.append(parsed)
 
-    # Remove the status bar (screen has a new line padded after)..
+    # Remove the status bar (screen has a new line padded after)
     for i in range(1, 3):
         if '[No Name]' in all_rows[-i]:
             del all_rows[-i:]
+            break
+        elif file_name and file_name in all_rows[-i]:
+            del all_rows[-i-1:]
             break
     else:
         raise Exception("couldn't find status bar...")
     return all_rows
 
 
-def _parse_text(lines, line_length):
-    return _parse(lines, line_length, eol_trim=2)
+def _parse_text(lines, line_length, mock_inst):
+    return _parse(lines, line_length, mock_inst, eol_trim=2)
 
 
-def _parse_screen(lines, line_length):
-    return _parse(lines, line_length, eol_trim=0)
+def _parse_screen(lines, line_length, mock_inst):
+    return _parse(lines, line_length, mock_inst ,eol_trim=0)
 
 
-def _check_scrolled(screen, nvim_rows, parsed_thing):
+def _check_scrolled(screen, nvim_rows, parsed_thing,
+                    max_scroll):
     '''
     the screen and text widget only ever store
     what is being showed to the user,
@@ -117,8 +124,13 @@ def _check_scrolled(screen, nvim_rows, parsed_thing):
     if it has been scrolled
     checks max 10 scrolls forward and 10 backward
     '''
-    viewable = screen.bot - screen.top
-    for i in range(1, MAX_SCROLL + 1):
+    viewable = len(parsed_thing)
+    screen_size = screen.bot - screen.top
+    if viewable != screen_size:
+        maybe_status_bar = screen_size - viewable
+        if maybe_status_bar > STATUS_BAR_HEIGHT:
+            raise Exception('fix this...')
+    for i in range(0, max_scroll + 1):
         end_index = i + viewable
         try:
             # CHECK IF SCROLLED DOWN
@@ -137,7 +149,7 @@ def _check_scrolled(screen, nvim_rows, parsed_thing):
     else:
         raise AssertionError('nvim rows did not match..\n \
                     make sure scroll amount is less than '
-                    + str(MAX_SCROLL))
+                    + str(max_scroll))
 
 
 def compare_screens(mock_inst):
@@ -154,8 +166,9 @@ def compare_screens(mock_inst):
     text_rows = _textwidget_rows(mock_inst.text)
     screen_rows = _screen_rows(mock_inst._screen._cells)
 
-    parsed_text = _parse_text(text_rows, line_length)
-    parsed_screen = _parse_screen(screen_rows, line_length)
+    parsed_text = _parse_text(text_rows, line_length, mock_inst)
+    parsed_screen = _parse_screen(screen_rows, line_length,
+                                  mock_inst)
     try:
         assert len(parsed_screen) == len(parsed_text)
     except:
@@ -165,8 +178,9 @@ def compare_screens(mock_inst):
     # A scroll may have happend
     except AssertionError:
         _check_scrolled(mock_inst._screen,
-                               nvim_rows,
-                               parsed_text)
+                       nvim_rows,
+                       parsed_text,
+                       mock_inst.max_scroll)
         # TODO move this inside _check_scrolled
         # can use the offset to check all cells
         for sr, tr in zip(parsed_screen, parsed_text):
@@ -182,7 +196,8 @@ class Event():
     def __init__(self, key, modifyer=None):
         '''
         mimics a tkinter key press event.
-        this just fudges it enough so it passes the checks for our function...
+        this just fudges it enough so it passes the checks
+        for our function...
         '''
         self.keysym = key
         self.char = key
@@ -213,7 +228,8 @@ def send_tk_key(tknvim, key, modifyer=None):
             if key in KEY_TABLE:
                 key = KEY_TABLE[key]
             else:
-                raise KeyError('Please pass an acceptable key in')
+                raise KeyError(
+                        'Please pass an acceptable key in')
         vimified = _stringify_key(key, [])
         tknvim._bridge.input(vimified)
     time.sleep(0.02)

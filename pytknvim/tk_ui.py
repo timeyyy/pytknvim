@@ -11,15 +11,13 @@ import sys
 import math
 import time
 
-import neovim
 from neovim_gui.ui_bridge import UIBridge
 from neovim import attach
 from neovim_gui.screen import Screen
-from tkquick.gui.tools import rate_limited, delay_call
 
 from pytknvim.util import _stringify_key, _stringify_color
 from pytknvim.util import _split_color, _invert_color
-from pytknvim.util import debug_echo
+from pytknvim.util import debug_echo, delay_call
 from pytknvim import tk_util
 
 try:
@@ -30,9 +28,6 @@ except ImportError:
     import tkinter as tk
     import tkinter.font as tkfont
 
-from threading import Thread
-from collections import deque
-# import cProfile, pstats, StringIO
 
 tk_modifiers = ('Alt_L', 'Alt_R',
                 'Control_L', 'Control_R',
@@ -75,12 +70,9 @@ KEY_TABLE = {
 
 
 class MixTk():
-    '''Tkinter actions we bind and use to communicate to neovim'''
-    def on_tk_select(self, arg):
-        arg.widget.tag_remove('sel', '1.0', 'end')
-        # TODO: this should change nvim visual range
-
-
+    '''
+    Tkinter actions we bind and use to communicate to neovim
+    '''
     def _tk_key(self,event, **k):
         keysym = event.keysym
         state = event.state
@@ -97,7 +89,8 @@ class MixTk():
             keysym = keysym[3:]
 
         # Translated so vim understands
-        input_str = _stringify_key(KEY_TABLE.get(keysym, keysym), state)
+        input_str = _stringify_key(
+                        KEY_TABLE.get(keysym, keysym), state)
         self._bridge.input(input_str)
 
 
@@ -105,20 +98,23 @@ class MixTk():
         self._bridge.exit()
 
 
+    @debug_echo
+    @delay_call(0.1)
     def _tk_resize(self, event):
         '''Let Neovim know we are changing size'''
         if not self._screen:
             return
         cols = int(math.floor(event.width / self._colsize))
         rows = int(math.floor(event.height / self._rowsize))
-        if self._screen.columns == cols and self._screen.rows == rows:
-            return
+        if self._screen.columns == cols:
+            if self._screen.rows == rows:
+                return
         self.current_cols = cols
         self.current_rows = rows
         self._bridge.resize(cols, rows)
-        # print('resizing c, r, w, h', cols,rows, event.width, event.height)
-        #self.root.after_idle(lambda:self._bridge.resize(cols, rows))
-        #time.sleep(1)
+        if self.debug_echo:
+            print('resizing c, r, w, h',
+                    cols,rows, event.width, event.height)
 
 
     def _clear_region(self, top, bot, left, right):
@@ -130,18 +126,19 @@ class MixTk():
         start = "%d.%d" % (top+1, left)
         end = "%d.%d" % (bot+1, right+1)
         self.text.delete(start, end)
-        # print('from {0} to {1}'.format(start, end))
-        # print(repr('clear {0}'.format(self.text.get(start, end))))
 
 
+    @debug_echo
     def bind_resize(self):
         '''
         after calling,
         widget changes will now be passed along to neovim
         '''
-        self._configure_id = self.text.bind('<Configure>', self._tk_resize)
+        self._configure_id = self.text.bind('<Configure>',
+                                            self._tk_resize)
 
 
+    @debug_echo
     def unbind_resize(self):
         '''
         after calling,
@@ -214,9 +211,10 @@ class MixTk():
                 else:
                     spaces += '\n'
             if self.debug_echo:
-                print('padding from ', start, ' with %d: '
-                                                % len(spaces))
-                print(repr(spaces))
+                pass
+                # print('padding from ', start, ' with %d: '
+                                                # % len(spaces))
+                # print(repr(spaces))
             self.text.insert(start, spaces)
 
 
@@ -224,15 +222,6 @@ class MixNvim():
 
 
     '''These methods get called by neovim'''
-
-    @delay_call(0.1)
-    def _delayed_update(self):
-        # update will be postponed by the above seconds each
-        # time the function gets called
-        self.unbind_resize()
-        # REALLY SLOWS THINGS DOWN...
-        self.text.master.update_idletasks()
-        self.bind_resize()
 
     @debug_echo
     def _nvim_resize(self, cols, rows):
@@ -242,21 +231,16 @@ class MixNvim():
         # only can support mono font i think..
         # also steal logic from gtk for faster updateing..
         self._screen = Screen(cols, rows)
-
+        width = cols * self._colsize
+        height = rows * self._rowsize
         def resize():
-            width = cols * self._colsize
-            height = rows * self._rowsize
             self.unbind_resize()
             self.text.master.geometry('%dx%d' % (width, height))
             self.bind_resize()
-
-        #print('resize', 'cols ',str(cols),'rows ',str(rows))
         self.root.after_idle(resize)
-        self._delayed_update()
-        #self.root.after_idle(self._delayed_nvim_resize, width, height)
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_clear(self):
         '''
         wipe everyything, even the ~ and status bar
@@ -274,7 +258,7 @@ class MixNvim():
                          add_eol=True,)
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_eol_clear(self):
         '''
         delete from index to end of line,
@@ -289,7 +273,7 @@ class MixNvim():
                         # self._screen.row+1, self._screen.col))
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
         # print('Moving cursor ', row,' ', col)
@@ -320,7 +304,7 @@ class MixNvim():
         self._insert_cursor = mode == 'insert'
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_set_scroll_region(self, top, bot, left, right):
         self._screen.set_scroll_region(top, bot, left, right)
 
@@ -352,9 +336,8 @@ class MixNvim():
         # self.text.yview_scroll(count, 'units')
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_highlight_set(self, attrs):
-        # print('ATTRS', attrs)
         self._attrs = self._get_tk_attrs(attrs)
 
 
@@ -406,7 +389,7 @@ class MixNvim():
         return rv
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_put(self, text):
         '''
         put a charachter into position, we only write the lines
@@ -530,11 +513,15 @@ class NvimTk(MixNvim, MixTk):
         self._reset_attrs_cache()
 
     def start(self, bridge):
-        # MAXIMUM COLS AND ROWS AVALIABLE (UNTIL WE RESIZE THEN THIS CHANGES)
-        self.current_cols = 80
-        self.current_rows = 24
-        bridge.attach(self.current_cols, self.current_rows, True)
+        # Maximum cols and rows avaliable
+        # When we resize then this changes
+        cols, rows = 80, 24
+        self.current_cols = cols
+        self.current_rows = rows
+        self._screen = Screen(cols, rows)
+        bridge.attach(cols, rows, rgb=True)
         self._bridge = bridge
+
         self.debug_echo = False
 
         self.root = tk.Tk()

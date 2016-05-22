@@ -9,6 +9,8 @@ import shlex
 import string
 import random
 from functools import wraps
+import sched
+import _thread as thread
 
 from neovim import attach
 
@@ -112,3 +114,22 @@ def debug_echo(func):
         return func(*args, **kwargs)
     return deco
 
+
+def delay_call(seconds):
+    '''Decorator to delay the runtime of your function,
+    each succesive call to function will refresh the timer,
+    canceling any previous functions
+    '''
+    my_scheduler = sched.scheduler(time.perf_counter, time.sleep)
+    def delayed_func(func):
+        def modded_func(*args, **kwrds):
+            if len(my_scheduler.queue) == 1:
+                my_scheduler.enter(seconds, 1, func, args, kwrds)
+                my_scheduler.cancel(my_scheduler.queue[0])
+            else:
+                my_scheduler.enter(seconds, 1, func, args, kwrds)
+                thread.start_new_thread(my_scheduler.run, ())
+        thread.start_new_thread(my_scheduler.run, ())
+        modded_func.scheduler = my_scheduler
+        return modded_func
+    return delayed_func

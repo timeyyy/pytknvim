@@ -98,12 +98,11 @@ class MixTk():
         self._bridge.exit()
 
 
-    @debug_echo
     @delay_call(0.1)
     def _tk_resize(self, event):
         '''Let Neovim know we are changing size'''
-        if not self._screen:
-            return
+        # if not self._screen:
+            # return
         cols = int(math.floor(event.width / self._colsize))
         rows = int(math.floor(event.height / self._rowsize))
         if self._screen.columns == cols:
@@ -117,7 +116,6 @@ class MixTk():
                     cols,rows, event.width, event.height)
 
 
-    @debug_echo
     def bind_resize(self):
         '''
         after calling,
@@ -127,7 +125,6 @@ class MixTk():
                                             self._tk_resize)
 
 
-    @debug_echo
     def unbind_resize(self):
         '''
         after calling,
@@ -233,21 +230,26 @@ class MixNvim():
     @debug_echo
     def _nvim_resize(self, cols, rows):
         '''Let neovim update tkinter when neovim changes size'''
-        #Todo Check all the heights and so on are correct, :)
+        # TODO
         # Make sure it works when user changes font,
         # only can support mono font i think..
-        # also steal logic from gtk for faster updateing..
         self._screen = Screen(cols, rows)
-        width = cols * self._colsize
-        height = rows * self._rowsize
+
+        toplevel = self.text.master
+        border = toplevel.winfo_rootx() - toplevel.winfo_x()
+        titlebar = toplevel.winfo_rooty() - toplevel.winfo_y()
+        width = (cols * self._colsize) + (2 * border)
+        height = (rows * self._rowsize) + (titlebar + border)
+        # fudge factor...
+        height += self._rowsize/3
         def resize():
             self.unbind_resize()
-            self.text.master.geometry('%dx%d' % (width, height))
+            toplevel.geometry('%dx%d' % (width, height))
             self.bind_resize()
         self.root.after_idle(resize)
 
 
-    # @debug_echo
+    @debug_echo
     def _nvim_clear(self):
         '''
         wipe everyything, even the ~ and status bar
@@ -265,7 +267,7 @@ class MixNvim():
                          add_eol=True,)
 
 
-    # @debug_echo
+    @debug_echo
     def _nvim_eol_clear(self):
         '''
         delete from index to end of line,
@@ -278,12 +280,11 @@ class MixNvim():
                          add_eol=False)
 
 
-    # @debug_echo
+    @debug_echo
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
         self._screen.cursor_goto(row, col)
-        # TODO del
-        self.text.see(tk.INSERT)
+        self.text.see("1.0")
 
 
     def _nvim_busy_start(self):
@@ -306,7 +307,7 @@ class MixNvim():
         self._insert_cursor = mode == 'insert'
 
 
-    # @debug_echo
+    @debug_echo
     def _nvim_set_scroll_region(self, top, bot, left, right):
         self._screen.set_scroll_region(top, bot, left, right)
 
@@ -338,7 +339,7 @@ class MixNvim():
         # self.text.yview_scroll(count, 'units')
 
 
-    # @debug_echo
+    @debug_echo
     def _nvim_highlight_set(self, attrs):
         self._attrs = self._get_tk_attrs(attrs)
 
@@ -390,7 +391,7 @@ class MixNvim():
         return rv
 
 
-    # @debug_echo
+    @debug_echo
     def _nvim_put(self, text):
         '''
         put a charachter into position, we only write the lines
@@ -439,6 +440,7 @@ class MixNvim():
                           self.root._w, self._icon)
 
 
+    @debug_echo
     def _flush(self):
         row, startcol, endcol = self._pending
         self._pending[0] = self._screen.row
@@ -468,6 +470,7 @@ class MixNvim():
             # print('flush with no draw')
 
 
+    @debug_echo
     def _draw(self, row, col, data):
         '''
         updates a line :)
@@ -479,6 +482,9 @@ class MixNvim():
 
             start = "{}.{}".format(row + 1, col)
             end = start+'+{0}c'.format(len(text))
+            if self.debug_echo:
+                print('replacing ', repr(self.text.get(start, end)))
+                print('with ', repr(text), ' at ', start, ' ',end)
             self.text.replace(start, end, text)
 
             if attrs:
@@ -525,7 +531,7 @@ class NvimTk(MixNvim, MixTk):
         bridge.attach(cols, rows, rgb=True)
         self._bridge = bridge
 
-        self.debug_echo = False
+        self.debug_echo = True
 
         self.root = tk.Tk()
         self.root.protocol('WM_DELETE_WINDOW', self._tk_quit)

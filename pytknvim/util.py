@@ -120,16 +120,17 @@ def delay_call(seconds):
     each succesive call to function will refresh the timer,
     canceling any previous functions
     '''
-    my_scheduler = sched.scheduler(time.perf_counter, time.sleep)
+    _scheduler = sched.scheduler(time.perf_counter, time.sleep)
     def delayed_func(func):
+        @wraps(func)
         def modded_func(*args, **kwrds):
-            if len(my_scheduler.queue) == 1:
-                my_scheduler.enter(seconds, 1, func, args, kwrds)
-                my_scheduler.cancel(my_scheduler.queue[0])
+            if len(_scheduler.queue) == 1:
+                _scheduler.enter(seconds, 1, func, args, kwrds)
+                _scheduler.cancel(_scheduler.queue[0])
             else:
-                my_scheduler.enter(seconds, 1, func, args, kwrds)
-                thread.start_new_thread(my_scheduler.run, ())
-        thread.start_new_thread(my_scheduler.run, ())
-        modded_func.scheduler = my_scheduler
+                _scheduler.enter(seconds, 1, func, args, kwrds)
+                thread.start_new_thread(_scheduler.run, ())
+        thread.start_new_thread(_scheduler.run, ())
+        modded_func.scheduler = _scheduler
         return modded_func
     return delayed_func

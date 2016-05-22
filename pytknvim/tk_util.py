@@ -2,11 +2,54 @@ import os
 import tkinter as tk
 
 
-class Text(tk.Text):
+class TkBlink():
     def __init__(self, *args, **kwargs):
-        tk.Text.__init__(self, *args, **kwargs)
-        self._added_tags = {}
+        super().__init__(*args, **kwargs)
+        self._blink_timer_id = None
+        self._blink_status = 'off'
+        self._blink_time = 500
 
+
+    def _do_blink(self):
+        if self._blink_status == 'off':
+            self._blink_status = 'on'
+            self.tag_add('cursorblock', self._blink_pos)
+            self.tag_config('cursorblock',
+                            background=self._blink_bg,
+                            foreground=self._blink_fg)
+        else:
+            self.tag_delete('cursorblock')
+            self._blink_status = 'off'
+
+        self._blink_timer_id = self.after(self._blink_time,
+                                          self._do_blink)
+
+
+    def blink_cursor(self, pos, fg, bg):
+        '''
+        alternate the background color of the cursorblock tag
+        self.blink_time = time inbetween blinks
+        recall the function when pos/fg/bg change
+        '''
+        if self._blink_timer_id:
+            self.after_cancel(self._blink_timer_id)
+        self._blink_pos = pos
+        self._blink_bg = bg
+        self._blink_fg = fg
+        self._do_blink()
+
+
+    def stop_blink(self):
+        '''remove cursor from screen'''
+        self.after_cancel(self._blink_timer_id)
+        self.tag_delete('cursorblock')
+        self._blink_status = 'off'
+
+
+class Text(TkBlink, tk.Text):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._added_tags = {}
 
     def get_pos(self, row=None, col=None, mark=tk.INSERT):
         '''returns row and column as an int'''

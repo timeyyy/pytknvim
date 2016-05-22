@@ -117,17 +117,6 @@ class MixTk():
                     cols,rows, event.width, event.height)
 
 
-    def _clear_region(self, top, bot, left, right):
-        '''
-        Delete from top left to bottom right from the ui widget
-        give screen coordinates in
-        '''
-        self._flush()
-        start = "%d.%d" % (top+1, left)
-        end = "%d.%d" % (bot+1, right+1)
-        self.text.delete(start, end)
-
-
     @debug_echo
     def bind_resize(self):
         '''
@@ -218,6 +207,24 @@ class MixTk():
             self.text.insert(start, spaces)
 
 
+    def _start_blinking(self):
+        # cursor is drawn seperatley in the window
+        row, col = self._screen.row, self._screen.col
+        text, attrs = self._screen.get_cursor()
+        pos = "%d.%d" % (row +1, col)
+
+        if not attrs:
+            attrs = self._get_tk_attrs(None)
+        fg = attrs[1].get('foreground')
+        bg = attrs[1].get('background')
+        try:
+            self.text.stop_blink()
+        except:
+            pass
+        self.text.blink_cursor(pos, fg, bg)
+
+
+
 class MixNvim():
 
 
@@ -269,17 +276,13 @@ class MixNvim():
         self.tk_delete_line(del_eol=False)
         self.tk_pad_line(screen_col=self._screen.col,
                          add_eol=False)
-        # self.text.mark_set(tk.INSERT, "{0}.{1}".format(
-                        # self._screen.row+1, self._screen.col))
 
 
     # @debug_echo
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
-        # print('Moving cursor ', row,' ', col)
         self._screen.cursor_goto(row, col)
-        self.text.mark_set(tk.INSERT, "{0}.{1}".
-                                        format(row+1, col))
+        # TODO del
         self.text.see(tk.INSERT)
 
 
@@ -296,7 +299,6 @@ class MixNvim():
 
 
     def _nvim_mouse_off(self):
-        '''er when is this fired?'''
         self.mouse_enabled = False
 
 
@@ -382,10 +384,9 @@ class MixNvim():
             c['background'] = _stringify_color(*c['background'])
             n['foreground'] = _stringify_color(*n['foreground'])
             n['background'] = _stringify_color(*n['background'])
-# n = ' '.join(['{0}="{1}"'.format(k, v) for k, v in n.items()])
-# c = ' '.join(['{0}="{1}"'.format(k, v) for k, v in c.items()])
-            rv = n
-            self._tk_attrs_cache[key] = n
+            # n = normal, c = cursor
+            rv = (n, c)
+            self._tk_attrs_cache[key] = (n, c)
         return rv
 
 
@@ -451,7 +452,7 @@ class MixNvim():
         bold = False
         for _, col, text, attrs in self._screen.iter(row,
                                     row, startcol, endcol - 1):
-            newbold = attrs and 'bold' in attrs
+            newbold = attrs and 'bold' in attrs[0]
             if newbold != bold or not text:
                 if buf:
                     self._draw(row, ccol, buf)
@@ -467,14 +468,16 @@ class MixNvim():
             # print('flush with no draw')
 
 
-    def _draw(self, row, col, data, cr=None, cursor=False):
+    def _draw(self, row, col, data):
         '''
         updates a line :)
         '''
         for text, attrs in data:
-            text, attrs = data[0]
+            if not attrs:
+                attrs = self._get_tk_attrs(None)
+            attrs = attrs[0]
 
-            start = "{}.{}".format(row+1, col)
+            start = "{}.{}".format(row + 1, col)
             end = start+'+{0}c'.format(len(text))
             self.text.replace(start, end, text)
 
@@ -528,6 +531,8 @@ class NvimTk(MixNvim, MixTk):
         self.root.protocol('WM_DELETE_WINDOW', self._tk_quit)
         text = tk_util.Text(self.root)
         self.text = text
+        # Hide tkinter cursor
+        self.text.config(insertontime=0)
 
         # Remove Default Bindings and what happens on insert etc
         bindtags = list(text.bindtags())
@@ -550,10 +555,8 @@ class NvimTk(MixNvim, MixTk):
         self._colsize = self._fnormal.measure('M')
         self._rowsize = self._fnormal.metrics('linespace')
 
-        text.tag_configure('red', background='red')
-        text.tag_configure('blue', background='blue')
-
         self.root.mainloop()
+
 
     def schedule_screen_update(self, apply_updates):
         '''This function is called from the bridge,
@@ -564,7 +567,9 @@ class NvimTk(MixNvim, MixTk):
         def do():
             apply_updates()
             self._flush()
+            self._start_blinking()
         self.root.after_idle(do)
+
 
     def quit(self):
         self.root.after_idle(self.root.quit)
@@ -576,20 +581,6 @@ class NvimFriendly(NvimTk):
 
     def __init__(self):
         super().__init__()
-
-    def _nvim_mode_change(self, mode):
-        self.text.config(
-                        insertwidth=4,
-                        insertontime=600,
-                        insertofftime=150,
-                        insertbackground='#21F221',
-                        insertborderwidth=0)
-        super()._nvim_mode_change(mode)
-        if mode  == 'insert':
-            pass
-            #self.text.config(cursor='left_ptr')
-        elif mode == 'normal':
-            self.text.config(cursor='hand2')
 
 
 def main(address=None):

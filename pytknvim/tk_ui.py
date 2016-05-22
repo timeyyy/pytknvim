@@ -367,12 +367,14 @@ class MixNvim():
         key = tuple(sorted((k, v,) for k, v in (attrs or {}).items()))
         rv = self._tk_attrs_cache.get(key, None)
         if rv is None:
-            fg = self._foreground if self._foreground != -1 else 0
-            bg = self._background if self._background != -1 else 0xffffff
+            fg = self._foreground if self._foreground != -1\
+                                                else 0
+            bg = self._background if self._background != -1\
+                                                else 0xffffff
             n = {'foreground': _split_color(fg),
                 'background': _split_color(bg),}
             if attrs:
-                # make sure that foreground and background are assigned first
+                # make sure that fg and bg are assigned first
                 for k in ['foreground', 'background']:
                     if k in attrs:
                         n[k] = _split_color(attrs[k])
@@ -381,14 +383,15 @@ class MixNvim():
                         n['foreground'], n['background'] = \
                             n['background'], n['foreground']
                     elif k == 'italic':
-                        n['font_style'] = 'italic'
+                        n['slant'] = 'italic'
                     elif k == 'bold':
-                        n['font_weight'] = 'bold'
+                        n['weight'] = 'bold'
                         # TODO
                         # if self._bold_spacing:
-                            # n['letter_spacing'] = str(self._bold_spacing)
+                            # n['letter_spacing'] \
+                                    # = str(self._bold_spacing)
                     elif k == 'underline':
-                        n['underline'] = 'solid'
+                        n['underline'] = '1'
             c = dict(n)
             c['foreground'] = _invert_color(*_split_color(fg))
             c['background'] = _invert_color(*_split_color(bg))
@@ -396,10 +399,10 @@ class MixNvim():
             c['background'] = _stringify_color(*c['background'])
             n['foreground'] = _stringify_color(*n['foreground'])
             n['background'] = _stringify_color(*n['background'])
-            n = ' '.join(['{0}="{1}"'.format(k, v) for k, v in n.items()])
-            c = ' '.join(['{0}="{1}"'.format(k, v) for k, v in c.items()])
-            rv = (n, c,)
-            self._tk_attrs_cache[key] = rv
+# n = ' '.join(['{0}="{1}"'.format(k, v) for k, v in n.items()])
+# c = ' '.join(['{0}="{1}"'.format(k, v) for k, v in c.items()])
+            rv = n
+            self._tk_attrs_cache[key] = n
         return rv
 
 
@@ -409,15 +412,15 @@ class MixNvim():
         put a charachter into position, we only write the lines
         when a new row is being edited
         '''
-        # print('put was called row %s col %s  text %s' % (self._screen.row, self._screen.col, text))
         if self._screen.row != self._pending[0]:
             # write to screen if vim puts stuff on  a new line
-            print('calling flush from put')
             self._flush()
 
         self._screen.put(text, self._attrs)
-        self._pending[1] = min(self._screen.col - 1, self._pending[1])
-        self._pending[2] = max(self._screen.col, self._pending[2])
+        self._pending[1] = min(self._screen.col - 1,
+                               self._pending[1])
+        self._pending[2] = max(self._screen.col,
+                               self._pending[2])
 
 
     def _nvim_bell(self):
@@ -452,33 +455,6 @@ class MixNvim():
                           self.root._w, self._icon)
 
 
-    def apply_attribute(self, widget, name, line, position):
-        # Ensure the attribute name is associated with a tag configured with
-        # the corresponding attribute format
-        if name not in widget.added_tags:
-            prefix = name[0:2]
-            if prefix in ['fg', 'bg']:
-                color = name[3:]
-                if prefix == 'fg':
-                    widget.tag_configure(name, foreground=color)
-                else:
-                    widget.tag_configure(name, background=color)
-            widget.added_tags[name] = True
-        # Now clear occurences of the tags in the current line
-        ranges = widget.tag_ranges(name)
-        for i in range(0, len(ranges), 2):
-            start = ranges[i]
-            stop = ranges[i+1]
-            widget.tag_remove(start, stop)
-        if isinstance(position, list):
-            start = '%d.%d' % (line, position[0])
-            end = '%d.%d' % (line, position[1])
-            widget.tag_add(name, start, end)
-        else:
-            pos = '%d.%d' % (line, position)
-            widget.tag_add(name, pos)
-
-
     def _flush(self):
         row, startcol, endcol = self._pending
         self._pending[0] = self._screen.row
@@ -490,10 +466,9 @@ class MixNvim():
         ccol = startcol
         buf = []
         bold = False
-        # print('start row in flush is', row)
-        for _, col, text, attrs in self._screen.iter(row, row, startcol,
-                                                     endcol - 1):
-            newbold = attrs and 'bold' in attrs[0]
+        for _, col, text, attrs in self._screen.iter(row,
+                                    row, startcol, endcol - 1):
+            newbold = attrs and 'bold' in attrs
             if newbold != bold or not text:
                 if buf:
                     self._draw(row, ccol, buf)
@@ -507,19 +482,21 @@ class MixNvim():
         else:
             pass
             # print('flush with no draw')
-        #sys.exit()
 
 
     def _draw(self, row, col, data, cr=None, cursor=False):
         '''
         updates a line :)
         '''
-        assert len(data) == 1
-        text, attrs = data[0]
+        for text, attrs in data:
+            text, attrs = data[0]
 
-        start = "{}.{}".format(row+1, col)
-        end = start+'+{0}c'.format(len(text))
-        self.text.replace(start, end, text)
+            start = "{}.{}".format(row+1, col)
+            end = start+'+{0}c'.format(len(text))
+            self.text.replace(start, end, text)
+
+            if attrs:
+                self.text.apply_attribute(attrs, start, end)
 
 
     def _nvim_exit(self, arg):
@@ -558,7 +535,7 @@ class NvimTk(MixNvim, MixTk):
         self.current_rows = 24
         bridge.attach(self.current_cols, self.current_rows, True)
         self._bridge = bridge
-        self.debug_echo = True
+        self.debug_echo = False
 
         self.root = tk.Tk()
         self.root.protocol('WM_DELETE_WINDOW', self._tk_quit)
@@ -636,10 +613,9 @@ def main(address=None):
             address = sys.argv[1]
             nvim = attach('socket', path=address)
         except:
-            nvim = attach('child', argv=['/usr/bin/nvim',
-                                        '--embed',
-                                        '-u',
-                                        'NONE'])
+            args = ['/usr/bin/nvim', '--embed']
+            # args.extend(['-u', 'NONE'])
+            nvim = attach('child', argv=args)
     ui = NvimFriendly()
     bridge = UIBridge()
     bridge.connect(nvim, ui)

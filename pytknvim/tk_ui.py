@@ -10,11 +10,10 @@ Implements a UI for neovim  using tkinter.
 import sys
 import math
 import time
-
-from neovim_gui.ui_bridge import UIBridge
 from neovim import attach
-from neovim_gui.screen import Screen
 
+from pytknvim.ui_bridge import UIBridge
+from pytknvim.screen import Screen
 from pytknvim.util import _stringify_key, _stringify_color
 from pytknvim.util import _split_color, _invert_color
 from pytknvim.util import debug_echo, delay_call
@@ -537,7 +536,7 @@ class NvimTk(MixNvim, MixTk):
         bridge.attach(cols, rows, rgb=True)
         self._bridge = bridge
 
-        self.debug_echo = True
+        self.debug_echo = False
 
         self.root = tk.Tk()
         self.root.protocol('WM_DELETE_WINDOW', self._tk_quit)

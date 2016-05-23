@@ -94,7 +94,7 @@ def _parse(lines, line_length, mock_inst, eol_trim):
     # Unfortunatley the code is a bit confusing
     # I thought the handling was more similar than
     # different for the two cases...
-    file_name =  mock_inst.test_nvim.eval('expand("%")')
+    file_name =  mock_inst.test_nvim.eval('expand("%:t")')
     side_bar = mock_inst.test_nvim.eval('&relativenumber') \
                         or mock_inst.test_nvim.eval('&number')
     all_rows = []

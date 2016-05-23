@@ -12,8 +12,8 @@ import _thread as thread
 from itertools import count
 
 import pytest
-from neovim_gui.ui_bridge import UIBridge
 
+from pytknvim.ui_bridge import UIBridge
 from pytknvim.tk_ui import NvimTk
 from pytknvim.util import attach_headless
 from pytknvim.tests.util import compare_screens, send_tk_key
@@ -268,12 +268,13 @@ class TestIntegration(VimCommands):
         doesn't test anything that our other tests doesn't,
         but just paves the way for testing a file
         '''
-        test_file = 'weakref'
+        test_file = os.path.join(os.path.dirname(__file__),
+                                 'test_file')
         self.v_normal_mode()
         self.send_tk_key(*':e! '+test_file)
         self.send_tk_key('Enter')
         # Give time for actions to take place
-        time.sleep(0.5)
+        time.sleep(1)
         self.compare_screens()
         # TODO READ LEN OF FILE
         old_max = self.nvimtk.max_scroll
@@ -287,6 +288,8 @@ class TestIntegration(VimCommands):
         self.max_sroll = old_max
 
 
+    # TODO Failing when used in combination with another test
+    @pytest.mark.failing
     def test_number(self):
         to_test = ('load', 'basic_insert', 'enter_key')
         self.nvim.command("set nonumber")

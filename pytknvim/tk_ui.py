@@ -98,6 +98,7 @@ class MixTk():
         self._bridge.exit()
 
 
+    @debug_echo
     @delay_call(0.1)
     def _tk_resize(self, event):
         '''Let Neovim know we are changing size'''
@@ -476,12 +477,16 @@ class MixNvim():
         updates a line :)
         '''
         for text, attrs in data:
+            try:
+                start = end
+            except UnboundLocalError:
+                start = "{}.{}".format(row + 1, col)
+            end = start+'+{0}c'.format(len(text))
+
             if not attrs:
                 attrs = self._get_tk_attrs(None)
             attrs = attrs[0]
 
-            start = "{}.{}".format(row + 1, col)
-            end = start+'+{0}c'.format(len(text))
             if self.debug_echo:
                 print('replacing ', repr(self.text.get(start, end)))
                 print('with ', repr(text), ' at ', start, ' ',end)
@@ -489,6 +494,7 @@ class MixNvim():
 
             if attrs:
                 self.text.apply_attribute(attrs, start, end)
+            start
 
 
     def _nvim_exit(self, arg):

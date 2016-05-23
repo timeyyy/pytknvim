@@ -102,6 +102,7 @@ class TestIntegration(VimCommands):
     # TODO
     # Our compare_screen function doesn't work with number set
         cls.nvim.command("set nonumber")
+        cls.nvim.command("set norelativenumber")
         cls.nvim.command("set noswapfile")
 
     def teardown_class(cls):
@@ -273,6 +274,7 @@ class TestIntegration(VimCommands):
         self.send_tk_key('Enter')
         # Give time for actions to take place
         time.sleep(0.5)
+        self.compare_screens()
         # TODO READ LEN OF FILE
         old_max = self.nvimtk.max_scroll
         self.nvimtk.max_scroll = 500
@@ -283,3 +285,14 @@ class TestIntegration(VimCommands):
         time.sleep(0.5)
         self.compare_screens()
         self.max_sroll = old_max
+
+
+    def test_number(self):
+        to_test = ('load', 'basic_insert', 'enter_key')
+        self.nvim.command("set nonumber")
+        self.nvim.command("set relativenumber")
+        time.sleep(0.5)
+        for test in to_test:
+            method = getattr(self, 'test_' + test)
+            method()
+            self.teardown_method(method)

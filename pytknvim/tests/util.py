@@ -52,6 +52,37 @@ def _screen_rows(cells):
         yield ''.join(i for i in line)
 
 
+def _remove_sidebar(line):
+    '''remove the numbers and space if they are there'''
+    found_numbers = False
+    found_char = False
+    for i, char in enumerate(line):
+        if not found_numbers:
+            try:
+                int(char)
+            except ValueError:
+                if char != ' ':
+                    found_char = True
+                continue
+            else:
+                found_numbers = True
+        else:
+            try:
+                int(char)
+            except ValueError:
+                break
+            else:
+                continue
+    if found_numbers:
+        if not found_char:
+            return line[i+1:]
+        else:
+            raise Exception('chars where found in sidebar...',
+                            line)
+    else:
+        return line
+
+
 def _parse(lines, line_length, mock_inst, eol_trim):
     '''
     make the values for screen and tkinter text widget
@@ -64,6 +95,8 @@ def _parse(lines, line_length, mock_inst, eol_trim):
     # I thought the handling was more similar than
     # different for the two cases...
     file_name =  mock_inst.test_nvim.eval('expand("%")')
+    side_bar = mock_inst.test_nvim.eval('&relativenumber') \
+                        or mock_inst.test_nvim.eval('&number')
     all_rows = []
     for i, line in enumerate(lines):
         # screen doesn't have a \n
@@ -76,8 +109,11 @@ def _parse(lines, line_length, mock_inst, eol_trim):
             if '-- INSERT --' not in line:
                 raise
             break
+        if side_bar:
+            line = _remove_sidebar(line)
         if line[0] == '~':
-            if eol_trim: parsed = line[1:-eol_trim].rstrip()
+            if eol_trim:
+                parsed = line[1:-eol_trim].rstrip()
             else:
                 parsed = line[1:].rstrip()
             if not parsed:

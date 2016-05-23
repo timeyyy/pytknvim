@@ -37,7 +37,7 @@ def attach_socket(path=None):
 def attach_child():
     return attach('child', argv=['nvim', '--embed'])
 
-def attach_headless(*nvim_args, path=None):
+def attach_headless(path=None, *nvim_args):
     if not path:
         path = '/tmp/nvim' + rand_str(8)
     os.environ['NVIM_LISTEN_ADDRESS'] = path

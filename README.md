@@ -13,9 +13,9 @@ Simple nvim gui implemented using tkinter
 
 #### Missing Features
 
-Passing Ctrl/Alt/Meta through to neovim.
-Python2 not supported (should be trivial to add)
-Stability.. a bit flaky on startup
+- Passing Ctrl/Alt/Meta through to neovim.
+- Python2 not supported (should be trivial to add)
+- Stability.. a bit flaky on startup
 
 #### Installation
 
@@ -28,3 +28,7 @@ pip install pytknvim
 ```sh
 pytknvim
 ```
+
+### Screenshot
+
+![DEMO](demo.png?raw=true)

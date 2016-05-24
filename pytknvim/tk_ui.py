@@ -98,7 +98,7 @@ class MixTk():
         self._bridge.exit()
 
 
-    @debug_echo
+    # @debug_echo
     @delay_call(0.1)
     def _tk_resize(self, event):
         '''Let Neovim know we are changing size'''
@@ -221,7 +221,7 @@ class MixNvim():
 
     '''These methods get called by neovim'''
 
-    @debug_echo
+    # @debug_echo
     def _nvim_resize(self, cols, rows):
         '''Let neovim update tkinter when neovim changes size'''
         # TODO
@@ -262,7 +262,7 @@ class MixNvim():
                          add_eol=True,)
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_eol_clear(self):
         '''
         delete from index to end of line,
@@ -275,7 +275,7 @@ class MixNvim():
                          add_eol=False)
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
         self._screen.cursor_goto(row, col)
@@ -302,7 +302,7 @@ class MixNvim():
         self._insert_cursor = mode == 'insert'
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_set_scroll_region(self, top, bot, left, right):
         self._screen.set_scroll_region(top, bot, left, right)
 
@@ -386,7 +386,7 @@ class MixNvim():
         return rv
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_put(self, text):
         '''
         put a charachter into position, we only write the lines
@@ -411,14 +411,18 @@ class MixNvim():
         pass
 
 
+    @debug_echo
     def _nvim_update_fg(self, fg):
         self._foreground = fg
         self._reset_attrs_cache()
 
 
+    @debug_echo
     def _nvim_update_bg(self, bg):
         self._background = bg
         self._reset_attrs_cache()
+        background = self._get_tk_attrs(None)[0]['background']
+        self.text.config(background=background)
 
 
     def _nvim_update_suspend(self, arg):
@@ -435,7 +439,6 @@ class MixNvim():
                           self.root._w, self._icon)
 
 
-    @debug_echo
     def _flush(self):
         row, startcol, endcol = self._pending
         self._pending[0] = self._screen.row
@@ -465,7 +468,6 @@ class MixNvim():
             # print('flush with no draw')
 
 
-    @debug_echo
     def _draw(self, row, col, data):
         '''
         updates a line :)
@@ -561,6 +563,7 @@ class NvimTk(MixNvim, MixTk):
         self._colsize = self._fnormal.measure('M')
         self._rowsize = self._fnormal.metrics('linespace')
 
+        self.text.config(background='black')
         self.root.mainloop()
 
 

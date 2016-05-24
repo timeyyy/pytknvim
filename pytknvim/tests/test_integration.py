@@ -34,7 +34,7 @@ class MockNvimText(NvimTk):
         '''starts our us threaded so we can run tests'''
         # scroll test will always check scrolling
         named_pipe = '/tmp/nvim{0}'.format(rand_str(16))
-        nvim = attach_headless('-u', 'NONE', path=named_pipe)
+        nvim = attach_headless(('-u', 'NONE'), path=named_pipe)
         ui = self
         self._bridge = UIBridge()
         thread.start_new_thread(self._bridge.connect,

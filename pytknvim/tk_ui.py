@@ -10,6 +10,7 @@ Implements a UI for neovim  using tkinter.
 import sys
 import math
 import time
+from distutils.spawn import find_executable
 from neovim import attach
 
 from pytknvim.ui_bridge import UIBridge
@@ -602,7 +603,8 @@ def main(address=None):
             address = sys.argv[1]
             nvim = attach('socket', path=address)
         except:
-            args = ['/usr/bin/nvim', '--embed']
+            nvim_binary = find_executable('nvim')
+            args = [nvim_binary, '--embed']
             # args.extend(['-u', 'NONE'])
             nvim = attach('child', argv=args)
     ui = NvimFriendly()

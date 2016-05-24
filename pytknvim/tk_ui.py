@@ -236,6 +236,7 @@ class MixNvim():
         height = (rows * self._rowsize) + (titlebar + border)
         # fudge factor...
         height += self._rowsize/3
+        width += self._colsize/1.2
         def resize():
             self.unbind_resize()
             toplevel.geometry('%dx%d' % (width, height))

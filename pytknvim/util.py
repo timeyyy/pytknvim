@@ -1,6 +1,8 @@
 '''
 some of these should go into neovim python client
 '''
+from __future__ import print_function
+
 import os
 import time
 from subprocess import *
@@ -11,6 +13,7 @@ import random
 from functools import wraps
 import sched
 import _thread as thread
+import timeit
 
 from neovim import attach
 
@@ -122,7 +125,8 @@ def delay_call(seconds):
     each succesive call to function will refresh the timer,
     canceling any previous functions
     '''
-    _scheduler = sched.scheduler(time.perf_counter, time.sleep)
+    _scheduler = sched.scheduler(timeit.default_timer,
+                                 time.sleep)
     def delayed_func(func):
         @wraps(func)
         def modded_func(*args, **kwrds):

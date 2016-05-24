@@ -187,16 +187,9 @@ class MixTk():
         col = self._get_col(screen_col)
         for n in range(0, count):
             start = "%d.%d" % (line + n, col)
-            # + 1 spaces to keep cursor on same line..
-            # TODO a bug in the cursor movement
-            spaces = " " * (1 + self.current_cols - col)
-            if not spaces:
-                import pdb;pdb.set_trace()
+            spaces = " " * (self.current_cols - col)
             if add_eol:
-                if not spaces:
-                    spaces = ' \n'
-                else:
-                    spaces += '\n'
+                spaces += '\n'
             if self.debug_echo:
                 pass
                 # print('padding from ', start, ' with %d: '

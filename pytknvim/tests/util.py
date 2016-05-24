@@ -101,7 +101,7 @@ def _parse(lines, line_length, mock_inst, eol_trim):
     for i, line in enumerate(lines):
         # screen doesn't have a \n
         if eol_trim:
-            assert line[-eol_trim:] == ' \n'
+            assert line[-eol_trim:] == '\n'
         try:
             assert len(line)-eol_trim  == line_length
         except AssertionError:
@@ -142,7 +142,7 @@ def _parse(lines, line_length, mock_inst, eol_trim):
 
 
 def _parse_text(lines, line_length, mock_inst):
-    return _parse(lines, line_length, mock_inst, eol_trim=2)
+    return _parse(lines, line_length, mock_inst, eol_trim=1)
 
 
 def _parse_screen(lines, line_length, mock_inst):

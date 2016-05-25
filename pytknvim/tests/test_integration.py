@@ -285,11 +285,10 @@ class TestIntegration(VimCommands):
         self.v_page_up()
         time.sleep(0.5)
         self.compare_screens()
-        self.max_sroll = old_max
+        self.nvimtk.max_sroll = old_max
+        self.nvim.command('bwipeout')
 
 
-    # TODO Failing when used in combination with another test
-    @pytest.mark.failing
     def test_number(self):
         to_test = ('load', 'basic_insert', 'enter_key')
         self.nvim.command("set nonumber")

@@ -85,7 +85,8 @@ class MixTk():
     def _tk_key(self,event, **k):
         keysym = event.keysym
         state = parse_tk_state(event.state)
-        if event.char not in ('', ' ') and not event.state:
+        if event.char not in ('', ' ') \
+                    and state in (None, 'Shift'):
             if event.keysym_num == ord(event.char):
                 # Send through normal keys
                 self._bridge.input(event.char)
@@ -221,7 +222,6 @@ class MixTk():
         except:
             pass
         self.text.blink_cursor(pos, fg, bg)
-
 
 
 class MixNvim():

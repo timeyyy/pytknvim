@@ -4,8 +4,7 @@ Implements a UI for neovim  using tkinter.
 * The widget has lines updated/deleted so that any
   given time it only contains what is being displayed.
 
-* The widget is filled with spaces to simplify moving
-  the cursor around
+* The widget is filled with spaces
 '''
 import sys
 import math
@@ -29,10 +28,20 @@ except ImportError:
     import tkinter.font as tkfont
 
 
+def parse_tk_state(state):
+    if state & 0x4:
+        return 'Ctrl'
+    elif state & 0x8:
+        return 'Alt'
+    elif state & 0x1:
+        return 'Shift'
+
+
 tk_modifiers = ('Alt_L', 'Alt_R',
                 'Control_L', 'Control_R',
                 'Shift_L', 'Shift_R',
                 'Win_L', 'Win_R')
+
 
 KEY_TABLE = {
     'slash': '/',
@@ -75,9 +84,8 @@ class MixTk():
     '''
     def _tk_key(self,event, **k):
         keysym = event.keysym
-        state = event.state
-
-        if event.char not in ('', ' '):
+        state = parse_tk_state(event.state)
+        if event.char not in ('', ' ') and not event.state:
             if event.keysym_num == ord(event.char):
                 # Send through normal keys
                 self._bridge.input(event.char)

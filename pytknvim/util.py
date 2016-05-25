@@ -76,13 +76,12 @@ def rand_str(length):
 
 def _stringify_key(key, state):
     send = []
-    if state:
-        if 'Shift' in key:
-            send.append('S')
-        elif 'Ctrl' in key:
-            send.append('C')
-        elif 'Alt' in key:
-            send.append('A')
+    if state == 'Shift':
+        send.append('S')
+    elif state == 'Ctrl':
+        send.append('C')
+    elif state =='Alt':
+        send.append('A')
     send.append(key)
     return '<' + '-'.join(send) + '>'
 

@@ -13,7 +13,7 @@ Simple nvim gui implemented using tkinter
 
 #### Missing Features
 
-- Passing Ctrl/Alt/Meta through to neovim.
+- Using Windows/Super key for modifiers.(should be trivial...)
 - Python2 not supported (should be trivial to add)
 - Stability.. a bit flaky on startup
 

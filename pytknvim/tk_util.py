@@ -51,9 +51,17 @@ class Text(TkBlink, tk.Text):
         super().__init__(*args, **kwargs)
         self._added_tags = {}
 
+
     def get_pos(self, row=None, col=None, mark=tk.INSERT):
         '''returns row and column as an int'''
         return (int(x) for x in self.index(mark).split('.'))
+
+
+    def make_font_size(self, size):
+        if os.name == 'nt':
+            return size
+        else:
+            return size - 2
 
 
     def highlight_pattern(self, pattern, tag, start="1.0",

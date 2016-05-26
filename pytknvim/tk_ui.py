@@ -562,11 +562,12 @@ class NvimTk(MixNvim, MixTk):
         self.bind_resize()
 
         # The negative number makes it pixels instead of point sizes
-        self._fnormal = tkfont.Font(family='Monospace', size=12)
-        self._fbold = tkfont.Font(family='Monospace', weight='bold', size=12)
-        self._fitalic = tkfont.Font(family='Monospace', slant='italic', size=12)
+        size = text.make_font_size(13)
+        self._fnormal = tkfont.Font(family='Monospace', size=size)
+        self._fbold = tkfont.Font(family='Monospace', weight='bold', size=size)
+        self._fitalic = tkfont.Font(family='Monospace', slant='italic', size=size)
         self._fbolditalic = tkfont.Font(family='Monospace', weight='bold',
-                                 slant='italic', size=12)
+                                 slant='italic', size=size)
         self.text.config(font=self._fnormal, wrap=tk.NONE)
         self._colsize = self._fnormal.measure('M')
         self._rowsize = self._fnormal.metrics('linespace')

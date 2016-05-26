@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name = 'pytknvim',
-     version='0.1.3',
+     version='0.1.5',
      description = 'tkinter text widget using neovim',
      url = 'https://github.com/timeyyy/pytknvim',
      author='timeyyy',

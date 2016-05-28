@@ -430,6 +430,8 @@ class MixNvim():
     def _nvim_update_fg(self, fg):
         self._foreground = fg
         self._reset_attrs_cache()
+        foreground = self._get_tk_attrs(None)[0]['foreground']
+        self.text.config(foreground=foreground)
 
 
     # @debug_echo

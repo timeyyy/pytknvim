@@ -27,6 +27,7 @@ except ImportError:
     import tkinter as tk
     import tkinter.font as tkfont
 
+RESIZE_DELAY = 0.04
 
 def parse_tk_state(state):
     if state & 0x4:
@@ -108,7 +109,7 @@ class MixTk():
 
 
     # @debug_echo
-    @delay_call(0.1)
+    @delay_call(RESIZE_DELAY)
     def _tk_resize(self, event):
         '''Let Neovim know we are changing size'''
         # if not self._screen:
@@ -229,7 +230,7 @@ class MixNvim():
 
     '''These methods get called by neovim'''
 
-    # @debug_echo
+    @debug_echo
     def _nvim_resize(self, cols, rows):
         '''Let neovim update tkinter when neovim changes size'''
         # TODO
@@ -248,8 +249,14 @@ class MixNvim():
         def resize():
             self.unbind_resize()
             toplevel.geometry('%dx%d' % (width, height))
-            self.bind_resize()
-        self.root.after_idle(resize)
+        self.root.after(1, resize)
+        # Gemotery function is not serial, it gives a chance for other
+        # functions to be called while the resize is happening.
+        # Tkinter must finish resizing the window before calling bind_resize
+        # otherwise _tk_resize will be called and if widght and height
+        # doesn't map into the existing cols/rows we will get an infinte
+        # loop
+        self.root.after(int(RESIZE_DELAY*1000), self.bind_resize)
 
 
     @debug_echo
@@ -342,7 +349,7 @@ class MixNvim():
         # self.text.yview_scroll(count, 'units')
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_highlight_set(self, attrs):
         self._attrs = self._get_tk_attrs(attrs)
 
@@ -419,13 +426,13 @@ class MixNvim():
         pass
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_update_fg(self, fg):
         self._foreground = fg
         self._reset_attrs_cache()
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_update_bg(self, bg):
         self._background = bg
         self._reset_attrs_cache()
@@ -491,9 +498,9 @@ class MixNvim():
                 attrs = self._get_tk_attrs(None)
             attrs = attrs[0]
 
-            if self.debug_echo:
-                print('replacing ', repr(self.text.get(start, end)))
-                print('with ', repr(text), ' at ', start, ' ',end)
+            # if self.debug_echo:
+                # print('replacing ', repr(self.text.get(start, end)))
+                # print('with ', repr(text), ' at ', start, ' ',end)
             self.text.replace(start, end, text)
 
             if attrs:

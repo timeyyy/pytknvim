@@ -273,8 +273,7 @@ class NvimHandler(MixTk):
         self._bridge.connect(nvim, self.text)
         self._screen = Screen(self.current_cols, self.current_rows)
         self._bridge.attach(self.current_cols, self.current_rows, rgb=True)
-        # if len(sys.argv) > 1:
-            # nvim.command('edit ' + sys.argv[1])
+        bridge._call(bridge._nvim.request, "ui_set_popupmenu_external", True)
         self.connected = True
         self.text.nvim = nvim
         return nvim
@@ -552,8 +551,6 @@ class NvimHandler(MixTk):
                 self.text.apply_attribute(attrs, start, end)
             start
 
-
-    @debug_echo
     def _nvim_exit(self, arg):
         print('in exit')
         import pdb;pdb.set_trace()
@@ -563,6 +560,22 @@ class NvimHandler(MixTk):
     def _nvim_update_sp(self, *args):
         pass
 
+    def _nvim_popupmenu_show_items(self, items, sel):
+        print('pum show', items)
+        return
+        self.text.pum_show(items, sel, self._screen.row,
+                                        self._screen.col)
+
+    # TODO TYPO in nvim event..
+    def _nvim_popupmeny_select_item(self, num):
+        print('pum sel')
+        return
+        self.text.pum_select(num)
+
+    def _nvim_popupmenu_hide(self):
+        print('pum hide')
+        return
+        self.text.pum_hide()
 
 class NvimTk(tk_util.Text):
     '''namespace for neovim related methods,
@@ -574,10 +587,6 @@ class NvimTk(tk_util.Text):
 
     # Neovim interpruts the actions and calls certain
     # functions which are defined and implemented in tk
-
-    # The api from neovim does stuff line by line,
-    # so each callback from neovim produces a series
-    # of miniscule actions which in the end updates a line
 
     # So we can shutdown the neovim connections
     instances = []
@@ -679,6 +688,3 @@ class NvimTk(tk_util.Text):
     def quit(self):
         ''' destroy the widget, called from the bridge'''
         self.after_idle(self.destroy)
-
-# if __name__ == '__main__':
-    # main()

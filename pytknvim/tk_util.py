@@ -1,6 +1,8 @@
 import os
 import tkinter as tk
 
+from tk_popupmenu import PUM
+
 
 class TkBlink():
     def __init__(self, *args, **kwargs):
@@ -46,7 +48,7 @@ class TkBlink():
         self._blink_status = 'off'
 
 
-class Text(TkBlink, tk.Text):
+class Text(PUM, TkBlink, tk.Text):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._added_tags = {}

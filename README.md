@@ -13,6 +13,7 @@ Simple nvim gui implemented using tkinter
 
 #### Missing Features
 
+- **Vertical splits (Requires conversion to Canvas widget or externalized windows from nvim)**
 - Using Windows/Super key for modifiers.(should be trivial...)
 - Python2 not supported (should be trivial to add)
 - Stability.. a bit flaky on startup

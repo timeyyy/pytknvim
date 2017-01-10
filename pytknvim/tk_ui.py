@@ -6,6 +6,7 @@ Implements a UI for neovim  using tkinter.
 
 * The widget is filled with spaces
 '''
+
 import sys
 import math
 import time
@@ -26,6 +27,8 @@ try:
 except ImportError:
     import tkinter as tk
     import tkinter.font as tkfont
+
+import attr
 
 RESIZE_DELAY = 0.04
 
@@ -83,7 +86,7 @@ class MixTk():
     '''
     Tkinter actions we bind and use to communicate to neovim
     '''
-    def _tk_key(self,event, **k):
+    def tk_key_pressed(self,event, **k):
         keysym = event.keysym
         state = parse_tk_state(event.state)
         if event.char not in ('', ' ') \
@@ -99,8 +102,7 @@ class MixTk():
             keysym = keysym[3:]
 
         # Translated so vim understands
-        input_str = _stringify_key(
-                        KEY_TABLE.get(keysym, keysym), state)
+        input_str = _stringify_key( KEY_TABLE.get(keysym, keysym), state)
         self._bridge.input(input_str)
 
 
@@ -132,8 +134,7 @@ class MixTk():
         after calling,
         widget changes will now be passed along to neovim
         '''
-        self._configure_id = self.text.bind('<Configure>',
-                                            self._tk_resize)
+        self._configure_id = self.text.bind('<Configure>', self._tk_resize)
 
 
     def unbind_resize(self):
@@ -220,15 +221,57 @@ class MixTk():
         bg = attrs[1].get('background')
         try:
             self.text.stop_blink()
-        except:
+        except Exception:
             pass
         self.text.blink_cursor(pos, fg, bg)
 
 
-class MixNvim():
-
-
+class NvimHandler(MixTk):
     '''These methods get called by neovim'''
+
+    def __init__(self, text, toplevel, address, debug_echo):
+        self.text = text
+        self.toplevel = toplevel
+        self.debug_echo = debug_echo
+
+        self._insert_cursor = False
+        self._screen = None
+        self._foreground = -1
+        self._background = -1
+        self._pending = [0,0,0]
+        self._attrs = {}
+        self._reset_attrs_cache()
+        self._colsize = None
+        self._rowsize = None
+
+        # Have we connected to an nvim instance?
+        self.connected = False
+        # Connecition Info for neovim
+        self.address = address
+        cols = 80
+        rows = 24
+        self.current_cols = cols
+        self.current_rows = rows
+
+        self._screen = Screen(cols, rows)
+        self._bridge = UIBridge()
+
+    @debug_echo
+    def connect(self):
+        if self.address:
+            nvim = attach('socket', path=self.address)
+        else:
+            nvim_binary = find_executable('nvim')
+            args = [nvim_binary, '--embed']
+            # args.extend(['-u', 'NONE'])
+            nvim = attach('child', argv=args)
+
+        self._bridge.connect(nvim, self.text)
+        self._screen = Screen(self.current_cols, self.current_rows)
+        self._bridge.attach(self.current_cols, self.current_rows, rgb=True)
+        # if len(sys.argv) > 1:
+            # nvim.command('edit ' + sys.argv[1])
+        self.connected = True
 
     @debug_echo
     def _nvim_resize(self, cols, rows):
@@ -249,14 +292,14 @@ class MixNvim():
         def resize():
             self.unbind_resize()
             toplevel.geometry('%dx%d' % (width, height))
-        self.root.after(1, resize)
+        self.text.after(1, resize)
         # Gemotery function is not serial, it gives a chance for other
         # functions to be called while the resize is happening.
         # Tkinter must finish resizing the window before calling bind_resize
         # otherwise _tk_resize will be called and if widght and height
         # doesn't map into the existing cols/rows we will get an infinte
         # loop
-        self.root.after(int(RESIZE_DELAY*1000), self.bind_resize)
+        self.text.after(int(RESIZE_DELAY*1000), self.bind_resize)
 
 
     @debug_echo
@@ -277,7 +320,7 @@ class MixNvim():
                          add_eol=True,)
 
 
-    # @debug_echo
+    @debug_echo
     def _nvim_eol_clear(self):
         '''
         delete from index to end of line,
@@ -290,38 +333,44 @@ class MixNvim():
                          add_eol=False)
 
 
-    # @debug_echo
+    @debug_echo
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
         self._screen.cursor_goto(row, col)
         self.text.see("1.0")
 
 
+    @debug_echo
     def _nvim_busy_start(self):
         self._busy = True
 
 
+    @debug_echo
     def _nvim_busy_stop(self):
         self._busy = False
 
 
+    @debug_echo
     def _nvim_mouse_on(self):
         self.mouse_enabled = True
 
 
+    @debug_echo
     def _nvim_mouse_off(self):
         self.mouse_enabled = False
 
 
+    @debug_echo
     def _nvim_mode_change(self, mode):
         self._insert_cursor = mode == 'insert'
 
 
-    # @debug_echo
+    @debug_echo
     def _nvim_set_scroll_region(self, top, bot, left, right):
         self._screen.set_scroll_region(top, bot, left, right)
 
 
+    @debug_echo
     def _nvim_scroll(self, count):
         self._flush()
         self._screen.scroll(count)
@@ -354,11 +403,13 @@ class MixNvim():
         self._attrs = self._get_tk_attrs(attrs)
 
 
+    # @debug_echo
     def _reset_attrs_cache(self):
         self._tk_text_cache = {}
         self._tk_attrs_cache = {}
 
 
+    @debug_echo
     def _get_tk_attrs(self, attrs):
         key = tuple(sorted((k, v,) for k, v in (attrs or {}).items()))
         rv = self._tk_attrs_cache.get(key, None)
@@ -418,10 +469,12 @@ class MixNvim():
                                self._pending[2])
 
 
+    # @debug_echo
     def _nvim_bell(self):
         pass
 
 
+    # @debug_echo
     def _nvim_visual_bell(self):
         pass
 
@@ -442,20 +495,24 @@ class MixNvim():
         self.text.config(background=background)
 
 
+    # @debug_echo
     def _nvim_update_suspend(self, arg):
         self.root.iconify()
 
 
+    # @debug_echo
     def _nvim_set_title(self, title):
         self.root.title(title)
 
 
+    # @debug_echo
     def _nvim_set_icon(self, icon):
         self._icon = tk.PhotoImage(file=icon)
         self.root.tk.call('wm', 'iconphoto',
                           self.root._w, self._icon)
 
 
+    # @debug_echo
     def _flush(self):
         row, startcol, endcol = self._pending
         self._pending[0] = self._screen.row
@@ -485,6 +542,7 @@ class MixNvim():
             # print('flush with no draw')
 
 
+    @debug_echo
     def _draw(self, row, col, data):
         '''
         updates a line :)
@@ -510,11 +568,17 @@ class MixNvim():
             start
 
 
+    @debug_echo
     def _nvim_exit(self, arg):
-        self.root.destroy()
+        import pdb;pdb.set_trace()
+        # self.root.destroy()
+
+    @debug_echo
+    def _nvim_update_sp(self, *args):
+        pass
 
 
-class NvimTk(MixNvim, MixTk):
+class NvimTk(tk_util.Text):
     '''
     Business Logic for making a tkinter neovim text widget
 
@@ -528,61 +592,73 @@ class NvimTk(MixNvim, MixTk):
     so each callback from neovim produces a series
     of miniscule actions which in the end updates a line
     '''
+    # So we can shutdown the neovim connections
+    instances = []
 
-    def __init__(self):
+    def __init__(self, parent, toplevel, *args, address=False, **kwargs):
         # we destroy this when the layout changes
-        self.start_time = time.time()
-        self._insert_cursor = False
-        self._screen = None
-        self._foreground = -1
-        self._background = -1
-        self._pending = [0,0,0]
-        self._attrs = {}
-        self._reset_attrs_cache()
+        tk_util.Text.__init__(self, parent, *args, **kwargs)
+        self.nvim_handler = NvimHandler(text=self,
+                                        toplevel=toplevel,
+                                        address=address,
+                                        debug_echo=True)
 
-    def start(self, bridge):
-        # Maximum cols and rows avaliable
-        # When we resize then this changes
-        cols, rows = 80, 24
-        self.current_cols = cols
-        self.current_rows = rows
-        self._screen = Screen(cols, rows)
-        bridge.attach(cols, rows, rgb=True)
-        self._bridge = bridge
+        # TODO weak ref?
+        NvimTk.instances.append(self)
 
-        self.debug_echo = False
-
-        self.root = tk.Tk()
-        self.root.protocol('WM_DELETE_WINDOW', self._tk_quit)
-        text = tk_util.Text(self.root)
-        self.text = text
+    def nvimtk_config(self, *args):
         # Hide tkinter cursor
-        self.text.config(insertontime=0)
+        self.config(insertontime=0)
 
         # Remove Default Bindings and what happens on insert etc
-        bindtags = list(text.bindtags())
+        bindtags = list(self.bindtags())
         bindtags.remove("Text")
-        text.bindtags(tuple(bindtags))
+        self.bindtags(tuple(bindtags))
 
-        text.pack(expand=1, fill=tk.BOTH)
-        text.focus_set()
-
-        text.bind('<Key>', self._tk_key)
-        self.bind_resize()
+        self.bind('<Key>', self.nvim_handler.tk_key_pressed)
 
         # The negative number makes it pixels instead of point sizes
-        size = text.make_font_size(13)
+        size = self.make_font_size(13)
         self._fnormal = tkfont.Font(family='Monospace', size=size)
         self._fbold = tkfont.Font(family='Monospace', weight='bold', size=size)
         self._fitalic = tkfont.Font(family='Monospace', slant='italic', size=size)
         self._fbolditalic = tkfont.Font(family='Monospace', weight='bold',
                                  slant='italic', size=size)
-        self.text.config(font=self._fnormal, wrap=tk.NONE)
-        self._colsize = self._fnormal.measure('M')
-        self._rowsize = self._fnormal.metrics('linespace')
+        self.config(font=self._fnormal, wrap=tk.NONE)
 
-        self.text.config(background='black')
-        self.root.mainloop()
+        self.nvim_handler._colsize = self._fnormal.measure('M')
+        self.nvim_handler._rowsize = self._fnormal.metrics('linespace')
+
+        self.config(background='black')
+
+
+    def nvim_connect(self):
+        ''' force connection to neovim '''
+        self.nvim_handler.connect()
+        self.nvimtk_config()
+
+    @staticmethod
+    def kill_all():
+        ''' Kill all the neovim connections '''
+        raise NotImplementedError
+        for self in NvimTk.instances:
+            if self.nvim_handler.connected:
+                # Function hangs us..
+                self.nvim_handler._bridge.exit()
+
+    def pack(self, *arg, **kwarg):
+        tk_util.Text.pack(self, *arg, **kwarg)
+        if not self.nvim_handler.connected:
+            self.nvim_connect()
+
+        self.nvim_handler.bind_resize()
+
+    def grid(self, *arg, **kwarg):
+        tk_util.Text.grid(self, *arg, **kwarg)
+        if not self.nvim_handler.connected:
+            self.nvim_connect()
+
+        self.nvim_handler.bind_resize()
 
 
     def schedule_screen_update(self, apply_updates):
@@ -593,40 +669,14 @@ class NvimTk(MixNvim, MixTk):
         # self.start_time = time.time()
         def do():
             apply_updates()
-            self._flush()
-            self._start_blinking()
-        self.root.after_idle(do)
+            self.nvim_handler._flush()
+            self.nvim_handler._start_blinking()
+        self.master.after_idle(do)
 
 
     def quit(self):
-        self.root.after_idle(self.root.quit)
+        ''' destroy the widget '''
+        self.after_idle(self.destroy)
 
-
-class NvimFriendly(NvimTk):
-    '''Meant to be subclassed so the user can tweak easily,
-    atm im just using it to keep the config code seperate'''
-
-    def __init__(self):
-        super().__init__()
-
-
-def main(address=None):
-    if address:
-        nvim = attach('socket', path=address)
-    else:
-        try:
-            address = sys.argv[1]
-            nvim = attach('socket', path=address)
-        except:
-            nvim_binary = find_executable('nvim')
-            args = [nvim_binary, '--embed']
-            # args.extend(['-u', 'NONE'])
-            nvim = attach('child', argv=args)
-    ui = NvimFriendly()
-    bridge = UIBridge()
-    bridge.connect(nvim, ui)
-    if len(sys.argv) > 1:
-        nvim.command('edit ' + sys.argv[1])
-
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+    # main()

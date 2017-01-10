@@ -55,19 +55,19 @@ class UIBridge(object):
 
     def _ui_event_loop(self):
         self._sem.acquire()
-        if self._profile:
-            import StringIO
-            import cProfile
-            import pstats
-            pr = cProfile.Profile()
-            pr.enable()
-        self._ui.start(self)
-        if self._profile:
-            pr.disable()
-            s = StringIO.StringIO()
-            ps = pstats.Stats(pr, stream=s)
-            ps.strip_dirs().sort_stats(self._profile).print_stats(30)
-            self._profile = s.getvalue()
+        # if self._profile:
+            # import StringIO
+            # import cProfile
+            # import pstats
+            # pr = cProfile.Profile()
+            # pr.enable()
+        # self._ui.start(self)
+        # if self._profile:
+            # pr.disable()
+            # s = StringIO.StringIO()
+            # ps = pstats.Stats(pr, stream=s)
+            # ps.strip_dirs().sort_stats(self._profile).print_stats(30)
+            # self._profile = s.getvalue()
 
     def _nvim_event_loop(self):
         def on_setup():
@@ -89,13 +89,16 @@ class UIBridge(object):
                         #      for args in update[1:]]
                         # print >> sys.stderr, update[0], ' '.join(l)
                         try:
-                            handler = getattr(self._ui, '_nvim_' + update[0])
-                        except AttributeError:
+                            nvim_handler = getattr(self._ui, 'nvim_handler')
+                            handler = getattr(nvim_handler, '_nvim_' + update[0])
+                        except AttributeError as err:
                             pass
                         else:
                             for args in update[1:]:
                                 handler(*args)
-                except:
+                except Exception as err :
+                    print('ERROR OCCURED, unfortunalety no traceback..')
+                    import pdb;pdb.set_trace()
                     self._error = format_exc()
                     self._call(self._nvim.quit)
             if method == 'redraw':

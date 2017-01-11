@@ -3,17 +3,33 @@ import tkinter as tk
 
 from tk_ui import NvimTk
 
-
 root = tk.Tk()
-# n = NvimTk()
-# n.start()
-left = NvimTk(root, toplevel=True) # Toplevel arg must be implemetned
-left.pack(side=tk.LEFT)
-# left.nvim_connect()
-left.focus_set() # TODO onclick focus set?
 
-# right = NvimTk(root, toplevel=True)
-# right.pack(side=tk.RIGHT)
-# right.nvim_connect()
+def ex1():
+    tf = tk.Frame()
+    tf.pack(side=tk.TOP)
+    but = tk.Button(tf, text='i take focus')
+    but.config(command=lambda: but.focus_set())
+    but.pack()
+
+    left = NvimTk(root)
+    # Force Connection
+    left.nvim_connect()
+    left.pack(side=tk.LEFT)
+
+    right = NvimTk(root)
+    # Connection happens implicitly on packing or grdiing if required
+    right.pack(side=tk.RIGHT, fill='both', expand=1)
+
+
+def ex2():
+    # Toplevel example
+    text = NvimTk(root)
+    text.pack(expand=1, fill='both')
+
+# ex1()
+ex2()
 # root.protocol('WM_DELETE_WINDOW', NvimTk.kill_all)
 root.mainloop()
+
+

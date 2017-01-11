@@ -11,9 +11,6 @@ import shlex
 import string
 import random
 from functools import wraps
-import sched
-import _thread as thread
-import timeit
 
 from neovim import attach
 
@@ -119,23 +116,56 @@ def debug_echo(func):
     return deco
 
 
-def delay_call(seconds):
-    '''Decorator to delay the runtime of your function,
-    each succesive call to function will refresh the timer,
-    canceling any previous functions
-    '''
-    _scheduler = sched.scheduler(timeit.default_timer,
-                                 time.sleep)
-    def delayed_func(func):
+def rate_limited(max_per_second, mode='wait', delay_first_call=False):
+    """
+    Decorator that make functions not be called faster than
+
+    set mode to 'kill' to just ignore requests that are faster than the
+    rate.
+
+    set mode to 'refresh_timer' to reset the timer on successive calls
+
+    set delay_first_call to True to delay the first call as well
+    """
+    lock = threading.Lock()
+    min_interval = 1.0 / float(max_per_second)
+    def decorate(func):
+        last_time_called = [0.0]
         @wraps(func)
-        def modded_func(*args, **kwrds):
-            if len(_scheduler.queue) == 1:
-                _scheduler.enter(seconds, 1, func, args, kwrds)
-                _scheduler.cancel(_scheduler.queue[0])
+        def rate_limited_function(*args, **kwargs):
+            def run_func():
+                lock.release()
+                ret = func(*args, **kwargs)
+                last_time_called[0] = time.perf_counter()
+                return ret
+            lock.acquire()
+            elapsed = time.perf_counter() - last_time_called[0]
+            left_to_wait = min_interval - elapsed
+            if delay_first_call:
+                if left_to_wait > 0:
+                    if mode == 'wait':
+                        time.sleep(left_to_wait)
+                        return run_func()
+                    elif mode == 'kill':
+                        lock.release()
+                        return
+                else:
+                    return run_func()
             else:
-                _scheduler.enter(seconds, 1, func, args, kwrds)
-                thread.start_new_thread(_scheduler.run, ())
-        thread.start_new_thread(_scheduler.run, ())
-        modded_func.scheduler = _scheduler
-        return modded_func
-    return delayed_func
+                if not last_time_called[0] or elapsed > min_interval:
+                    return run_func()
+                elif mode == 'refresh_timer':
+                    print('Ref timer')
+                    lock.release()
+                    last_time_called[0] += time.perf_counter()
+                    return
+                elif left_to_wait > 0:
+                    if mode == 'wait':
+                        time.sleep(left_to_wait)
+                        return run_func()
+                    elif mode == 'kill':
+                        lock.release()
+                        return
+        return rate_limited_function
+    return decorate
+

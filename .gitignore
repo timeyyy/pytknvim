@@ -1,4 +1,5 @@
 tags
+.cache/
 *.txt
 *.pyc
 *.pyo

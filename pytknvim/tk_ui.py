@@ -13,11 +13,13 @@ import time
 from distutils.spawn import find_executable
 from neovim import attach
 
+from tkquick.gui.tools import rate_limited
+
 from pytknvim.ui_bridge import UIBridge
 from pytknvim.screen import Screen
 from pytknvim.util import _stringify_key, _stringify_color
 from pytknvim.util import _split_color, _invert_color
-from pytknvim.util import debug_echo, delay_call
+from pytknvim.util import debug_echo
 from pytknvim import tk_util
 
 try:
@@ -110,12 +112,9 @@ class MixTk():
         self._bridge.exit()
 
 
-    # @debug_echo
-    @delay_call(RESIZE_DELAY)
+    @rate_limited(1/RESIZE_DELAY, mode='kill')
     def _tk_resize(self, event):
         '''Let Neovim know we are changing size'''
-        # if not self._screen:
-            # return
         cols = int(math.floor(event.width / self._colsize))
         rows = int(math.floor(event.height / self._rowsize))
         if self._screen.columns == cols:
@@ -134,6 +133,7 @@ class MixTk():
         after calling,
         widget changes will now be passed along to neovim
         '''
+        print('binding resize to', self, self.text)
         self._configure_id = self.text.bind('<Configure>', self._tk_resize)
 
 
@@ -142,6 +142,7 @@ class MixTk():
         after calling,
         widget size changes will not be passed along to nvim
         '''
+        print('unbinding resize from', self)
         self.text.unbind('<Configure>', self._configure_id)
 
 
@@ -280,27 +281,6 @@ class NvimHandler(MixTk):
         # Make sure it works when user changes font,
         # only can support mono font i think..
         self._screen = Screen(cols, rows)
-
-        toplevel = self.text.master
-        border = toplevel.winfo_rootx() - toplevel.winfo_x()
-        titlebar = toplevel.winfo_rooty() - toplevel.winfo_y()
-        width = (cols * self._colsize) + (2 * border)
-        height = (rows * self._rowsize) + (titlebar + border)
-        # fudge factor...
-        height += self._rowsize/3
-        width += self._colsize/1.2
-        def resize():
-            self.unbind_resize()
-            toplevel.geometry('%dx%d' % (width, height))
-        self.text.after(1, resize)
-        # Gemotery function is not serial, it gives a chance for other
-        # functions to be called while the resize is happening.
-        # Tkinter must finish resizing the window before calling bind_resize
-        # otherwise _tk_resize will be called and if widght and height
-        # doesn't map into the existing cols/rows we will get an infinte
-        # loop
-        self.text.after(int(RESIZE_DELAY*1000), self.bind_resize)
-
 
     @debug_echo
     def _nvim_clear(self):
@@ -570,6 +550,7 @@ class NvimHandler(MixTk):
 
     @debug_echo
     def _nvim_exit(self, arg):
+        print('in exit')
         import pdb;pdb.set_trace()
         # self.root.destroy()
 
@@ -579,34 +560,45 @@ class NvimHandler(MixTk):
 
 
 class NvimTk(tk_util.Text):
+    '''namespace for neovim related methods,
+    requests are generally prefixed with _tk_,
+    responses are prefixed with _nvim_
     '''
-    Business Logic for making a tkinter neovim text widget
+    # we get keys, mouse movements inside tkinter, using binds,
+    # These binds are handed off to neovim using _input
 
-    we get keys, mouse movements inside tkinter, using binds,
-    These binds are handed off to neovim using _input
+    # Neovim interpruts the actions and calls certain
+    # functions which are defined and implemented in tk
 
-    Neovim interpruts the actions and calls certain
-    functions which are defined and implemented in tk
+    # The api from neovim does stuff line by line,
+    # so each callback from neovim produces a series
+    # of miniscule actions which in the end updates a line
 
-    The api from neovim does stuff line by line,
-    so each callback from neovim produces a series
-    of miniscule actions which in the end updates a line
-    '''
     # So we can shutdown the neovim connections
     instances = []
 
-    def __init__(self, parent, toplevel, *args, address=False, **kwargs):
-        # we destroy this when the layout changes
-        tk_util.Text.__init__(self, parent, *args, **kwargs)
+    def __init__(self, parent, *_, address=False, toplevel=False, **kwargs):
+        '''
+        :parent: normal tkinter parent or master of the widget
+        :toplevel: , if true will resize based off the toplevel etc
+        :address: neovim connection info
+            named pipe /tmp/nvim/1231
+            tcp/ip socket 127.0.0.1:4444
+            'child'
+            'headless'
+        :kwargs: config options for text widget
+        '''
+        tk_util.Text.__init__(self, parent, **kwargs)
         self.nvim_handler = NvimHandler(text=self,
                                         toplevel=toplevel,
                                         address=address,
-                                        debug_echo=True)
+                                        debug_echo=False)
 
         # TODO weak ref?
         NvimTk.instances.append(self)
 
-    def nvimtk_config(self, *args):
+    def _nvimtk_config(self, *args):
+        '''required config'''
         # Hide tkinter cursor
         self.config(insertontime=0)
 
@@ -616,6 +608,8 @@ class NvimTk(tk_util.Text):
         self.bindtags(tuple(bindtags))
 
         self.bind('<Key>', self.nvim_handler.tk_key_pressed)
+
+        self.bind('<Button-1>', lambda e: self.focus_set())
 
         # The negative number makes it pixels instead of point sizes
         size = self.make_font_size(13)
@@ -629,13 +623,11 @@ class NvimTk(tk_util.Text):
         self.nvim_handler._colsize = self._fnormal.measure('M')
         self.nvim_handler._rowsize = self._fnormal.metrics('linespace')
 
-        self.config(background='black')
-
 
     def nvim_connect(self):
         ''' force connection to neovim '''
         self.nvim_handler.connect()
-        self.nvimtk_config()
+        self._nvimtk_config()
 
     @staticmethod
     def kill_all():
@@ -644,7 +636,9 @@ class NvimTk(tk_util.Text):
         for self in NvimTk.instances:
             if self.nvim_handler.connected:
                 # Function hangs us..
+                # self.after(1, self.nvim_handler._bridge.exit)
                 self.nvim_handler._bridge.exit()
+
 
     def pack(self, *arg, **kwarg):
         tk_util.Text.pack(self, *arg, **kwarg)
@@ -652,6 +646,7 @@ class NvimTk(tk_util.Text):
             self.nvim_connect()
 
         self.nvim_handler.bind_resize()
+
 
     def grid(self, *arg, **kwarg):
         tk_util.Text.grid(self, *arg, **kwarg)
@@ -675,7 +670,7 @@ class NvimTk(tk_util.Text):
 
 
     def quit(self):
-        ''' destroy the widget '''
+        ''' destroy the widget, called from the bridge'''
         self.after_idle(self.destroy)
 
 # if __name__ == '__main__':

@@ -3,6 +3,9 @@ import time
 
 from pytknvim.tk_ui import KEY_TABLE, _stringify_key
 
+
+MAX_SCROLL = 10
+BUFFER_NUM = 1
 # TODO GET THIS DYNAMICALLY
 STATUS_BAR_HEIGHT = 3
 
@@ -198,7 +201,7 @@ def compare_screens(mock_inst):
     '''
     line_length = mock_inst._screen.columns
 
-    nvim_rows = _nvim_rows(mock_inst.test_nvim.buffers[0])
+    nvim_rows = _nvim_rows(mock_inst.test_nvim.buffers[BUFFER_NUM])
     text_rows = _textwidget_rows(mock_inst.text)
     screen_rows = _screen_rows(mock_inst._screen._cells)
 
@@ -254,7 +257,7 @@ def send_tk_key(tknvim, key, modifyer=None):
     assert modifyer in ('shift', 'alt', 'ctrl', None)
     if len(key) == 1:
         event = Event(key, modifyer)
-        tknvim._tk_key(event)
+        tknvim.nvim_handler.tk_key_pressed(event)
     else:
         # Special key
         for value in KEY_TABLE.values():
@@ -267,5 +270,5 @@ def send_tk_key(tknvim, key, modifyer=None):
                 raise KeyError(
                         'Please pass an acceptable key in')
         vimified = _stringify_key(key, [])
-        tknvim._bridge.input(vimified)
+        tknvim.nvim_handler._bridge.input(vimified)
     time.sleep(0.02)

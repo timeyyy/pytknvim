@@ -11,6 +11,7 @@ import shlex
 import string
 import random
 from functools import wraps
+from distutils.spawn import find_executable
 
 from neovim import attach
 
@@ -34,8 +35,12 @@ def attach_socket(path=None):
         return attach('socket', path=path)
 
 
-def attach_child():
-    return attach('child', argv=['nvim', '--embed'])
+def attach_child(nvim_args, exec_name='nvim'):
+    nvim_binary = find_executable(exec_name)
+    args = [nvim_binary, '--embed']
+    if nvim_args:
+        args.extend(nvim_args)
+    return attach('child', argv=args)
 
 
 def attach_headless(nvim_args=None, path=None):
@@ -54,6 +59,7 @@ def attach_headless(nvim_args=None, path=None):
     dnull.close()
     while proc.poll() or proc.returncode is None:
         try:
+            print('connected to headless socket', path)
             nvim = attach('socket', path=path)
             break
         except IOError:

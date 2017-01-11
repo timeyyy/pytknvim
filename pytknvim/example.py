@@ -25,6 +25,7 @@ def ex1():
 def ex2():
     # Toplevel example
     text = NvimTk(root)
+    text.nvim_connect('-u', 'NONE')
     text.pack(expand=1, fill='both')
 
 # ex1()

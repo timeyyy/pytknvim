@@ -9,40 +9,44 @@ Focuising on Integration testing...
 import os
 import time
 import _thread as thread
+import queue
 from itertools import count
+import tkinter as tk
 
 import pytest
 
-from pytknvim.ui_bridge import UIBridge
 from pytknvim.tk_ui import NvimTk
-from pytknvim.util import attach_headless
+from pytknvim.util import rand_str, attach_headless
 from pytknvim.tests.util import compare_screens, send_tk_key
-from pytknvim.tests.util import STATUS_BAR_HEIGHT
-from pytknvim.util import rand_str
+from pytknvim.tests.util import STATUS_BAR_HEIGHT, MAX_SCROLL, BUFFER_NUM
 
 
-MAX_SCROLL = 10
+def threaded_nvimtk(address, out_queue):
+    root = tk.Tk()
+    text = NvimTk(root)
+    text.nvim_connect('-u', 'NONE', headless=True, address=address)
+    text.pack()
 
+    out_queue.put(text)
 
-class MockNvimText(NvimTk):
+    def quit():
+        root.after_idle(root.quit)
+    text.quit = quit
+    root.mainloop()
 
-    '''
-    Our Nvim capable tkinter text widget
-    '''
-
-    def thread_ui(self):
-        '''starts our us threaded so we can run tests'''
-        # scroll test will always check scrolling
-        named_pipe = '/tmp/nvim{0}'.format(rand_str(16))
-        nvim = attach_headless(('-u', 'NONE'), path=named_pipe)
-        ui = self
-        self._bridge = UIBridge()
-        thread.start_new_thread(self._bridge.connect,
-                                (nvim, ui))
-
-        self.test_nvim = attach_headless(path=named_pipe)
-        time.sleep(2)
-        self.max_scroll = MAX_SCROLL
+def thread_ui():
+    '''starts our us threaded so we can run tests
+    this only works if we create the root in the same thread we
+    call mainloop frome'''
+    # scroll test will always check scrolling
+    named_pipe = '/tmp/nvim{0}'.format(rand_str(16))
+    out_queue = queue.Queue()
+    thread.start_new_thread(threaded_nvimtk, (named_pipe, out_queue))
+    nvimtk = out_queue.get(block=True)
+    time.sleep(1)
+    test_nvim = attach_headless(path=named_pipe)
+    time.sleep(1)
+    return nvimtk, test_nvim
 
 
 class VimCommands():
@@ -93,29 +97,28 @@ class VimCommands():
 
 class TestIntegration(VimCommands):
 
-
     def setup_class(cls):
-        cls.nvimtk = MockNvimText()
-        cls.nvimtk.thread_ui()
+        cls.nvimtk, cls.test_nvim = thread_ui()
+        cls.nvimtk.test_nvim = cls.test_nvim
+        cls.nvimtk._screen = cls.nvimtk.nvim_handler._screen
+        cls.nvimtk.text = cls.nvimtk
+
+        cls.nvimtk.max_scroll = MAX_SCROLL
         # This one has to be used because of threads and locks
         cls.nvim = cls.nvimtk.test_nvim
-    # TODO
-    # Our compare_screen function doesn't work with number set
-        cls.nvim.command("set nonumber")
-        cls.nvim.command("set norelativenumber")
-        cls.nvim.command("set noswapfile")
+        # TODO Our compare_screen function doesn't work with number set
+        cls.test_nvim.command("set nonumber")
+        cls.test_nvim.command("set norelativenumber")
+        cls.test_nvim.command("set noswapfile")
 
     def teardown_class(cls):
-        # Have to figure out how to teardown properlly
-        # Pipes still breaking...
         cls.nvimtk.quit()
         time.sleep(0.2)
-
 
     def teardown_method(self, method):
         '''delete everything so we get a clean slate'''
         self.send_tk_key('Esc')
-        buf = self.nvimtk.test_nvim.buffers[0]
+        buf = self.nvimtk.test_nvim.buffers[BUFFER_NUM]
         buf[:] = [""]
 
 
@@ -126,15 +129,12 @@ class TestIntegration(VimCommands):
                 key, mod = key
             send_tk_key(self.nvimtk, key, mod)
 
-
     def compare_screens(self):
         compare_screens(self.nvimtk)
-
 
     @pytest.mark.simple
     def test_load(self):
         self.compare_screens()
-
 
     @pytest.mark.simple
     def test_basic_insert(self):
@@ -201,6 +201,7 @@ class TestIntegration(VimCommands):
         # 3
 
 
+    # @nvimtester.register_test
     def test_scroll(self):
         # Force a scroll of an amount then compare_screens
         def _do(to_top):
@@ -213,19 +214,18 @@ class TestIntegration(VimCommands):
             self.compare_screens()
 
         # TODO GET THIS DYNAMICALLY
-        STATUS_BAR_HEIGHT = 3
         for i in count(1):
             self.v_page_down()
             self.v_insert_mode()
             scrolled = i\
-                       - self.nvimtk.current_rows\
+                       - self.nvimtk.nvim_handler.current_rows\
                        + STATUS_BAR_HEIGHT
             self.send_tk_key(*str(i-1))
             self.send_tk_key('Enter')
 
             self.nvimtk.max_scroll = 50
             if scrolled in (1, 2, self.nvimtk.max_scroll):
-                to_top = self.nvimtk.current_rows + scrolled
+                to_top = self.nvimtk.nvim_handler.current_rows + scrolled
                 _do(to_top)
             if scrolled == self.nvimtk.max_scroll:
                 break
@@ -243,19 +243,19 @@ class TestIntegration(VimCommands):
             self.v_page_down()
             self.v_insert_mode()
             scrolled = i\
-                       - self.nvimtk.current_rows\
+                       - self.nvimtk.nvim_handler.current_rows\
                        + STATUS_BAR_HEIGHT
             self.send_tk_key(*str(i-1))
             self.send_tk_key('Enter')
 
             # Make sure our last jump covers an entire page
             last_scroll = old_scroll = self.nvimtk.max_scroll
-            if last_scroll < self.nvimtk.current_rows:
-                last_scroll = self.nvimtk.current_rows + 1
+            if last_scroll < self.nvimtk.nvim_handler.current_rows:
+                last_scroll = self.nvimtk.nvim_handler.current_rows + 1
                 self.nvimtk.max_scroll = last_scroll
 
             if scrolled in (1, 2, last_scroll):
-                to_top = self.nvimtk.current_rows + scrolled
+                to_top = self.nvimtk.nvim_handler.current_rows + scrolled
                 time.sleep(1)
                 _do(to_top)
             if scrolled == last_scroll:

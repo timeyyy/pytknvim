@@ -10,7 +10,6 @@ Implements a UI for neovim  using tkinter.
 import sys
 import math
 import time
-from distutils.spawn import find_executable
 from neovim import attach
 
 from tkquick.gui.tools import rate_limited
@@ -20,6 +19,7 @@ from pytknvim.screen import Screen
 from pytknvim.util import _stringify_key, _stringify_color
 from pytknvim.util import _split_color, _invert_color
 from pytknvim.util import debug_echo
+from pytknvim.util import attach_headless, attach_child
 from pytknvim import tk_util
 
 try:
@@ -230,7 +230,7 @@ class MixTk():
 class NvimHandler(MixTk):
     '''These methods get called by neovim'''
 
-    def __init__(self, text, toplevel, address, debug_echo):
+    def __init__(self, text, toplevel, address=-1, debug_echo=False):
         self.text = text
         self.toplevel = toplevel
         self.debug_echo = debug_echo
@@ -258,14 +258,17 @@ class NvimHandler(MixTk):
         self._bridge = UIBridge()
 
     @debug_echo
-    def connect(self):
-        if self.address:
-            nvim = attach('socket', path=self.address)
+    def connect(self, *nvim_args, address=None, headless=False, exec_name='nvim'):
+        # Value has been set, otherwise default to this functions default value
+        if self.address != -1 and not address:
+            address = self.address
+
+        if headless:
+            nvim = attach_headless(nvim_args, address)
+        elif address:
+            nvim = attach('socket', path=address, argv=nvim_args)
         else:
-            nvim_binary = find_executable('nvim')
-            args = [nvim_binary, '--embed']
-            # args.extend(['-u', 'NONE'])
-            nvim = attach('child', argv=args)
+            nvim = attach_child(nvim_args=nvim_args, exec_name=exec_name)
 
         self._bridge.connect(nvim, self.text)
         self._screen = Screen(self.current_cols, self.current_rows)
@@ -273,6 +276,8 @@ class NvimHandler(MixTk):
         # if len(sys.argv) > 1:
             # nvim.command('edit ' + sys.argv[1])
         self.connected = True
+        self.text.nvim = nvim
+        return nvim
 
     @debug_echo
     def _nvim_resize(self, cols, rows):
@@ -624,9 +629,9 @@ class NvimTk(tk_util.Text):
         self.nvim_handler._rowsize = self._fnormal.metrics('linespace')
 
 
-    def nvim_connect(self):
+    def nvim_connect(self, *a, **k):
         ''' force connection to neovim '''
-        self.nvim_handler.connect()
+        self.nvim_handler.connect(*a, **k)
         self._nvimtk_config()
 
     @staticmethod
@@ -641,6 +646,7 @@ class NvimTk(tk_util.Text):
 
 
     def pack(self, *arg, **kwarg):
+        ''' connect to neovim if required'''
         tk_util.Text.pack(self, *arg, **kwarg)
         if not self.nvim_handler.connected:
             self.nvim_connect()
@@ -649,6 +655,7 @@ class NvimTk(tk_util.Text):
 
 
     def grid(self, *arg, **kwarg):
+        ''' connect to neovim if required'''
         tk_util.Text.grid(self, *arg, **kwarg)
         if not self.nvim_handler.connected:
             self.nvim_connect()

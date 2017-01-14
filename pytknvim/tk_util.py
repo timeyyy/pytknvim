@@ -157,3 +157,14 @@ class Text(TkBlink, tk.Text):
             else:
                 last += 1
         return last
+
+
+class Canvas(tk.Canvas):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def make_font_size(self, size):
+        if os.name == 'nt':
+            return size
+        else:
+            return size - 2

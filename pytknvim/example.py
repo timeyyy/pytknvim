@@ -28,8 +28,8 @@ def ex2():
     text.nvim_connect('-u', 'NONE')
     text.pack(expand=1, fill='both')
 
-# ex1()
-ex2()
+ex1()
+# ex2()
 # root.protocol('WM_DELETE_WINDOW', NvimTk.kill_all)
 root.mainloop()
 

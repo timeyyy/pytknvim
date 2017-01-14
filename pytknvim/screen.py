@@ -28,6 +28,81 @@ class Cell(object):
         other.text = self.text
         other.attrs = self.attrs
 
+class DirtyState():
+    '''
+    Return information about cells that require updating
+    '''
+    def __init__(self):
+        self.top = None
+        self.left = None
+        self.bot = None
+        self.right = None
+
+    def changed(self, top, left, bot, right):
+        '''mark some section as being dirty'''
+        if self.top == None:
+            self.top = top
+        else:
+            self.top = min(self.top, top)
+        if self.left == None:
+            self.left = left
+        else:
+            self.left = min(self.left, left)
+        if self.bot == None:
+            self.bot = bot
+        else:
+            self.bot = max(self.bot, bot)
+        if self.right == None:
+            self.right = right
+        else:
+            self.right = max(self.right, right)
+
+    def get(self):
+        ''' get the areas that are dirty, call is_dirty first'''
+        return self.top, self.left, self.bot, self.right
+
+    def reset(self):
+        '''mark the state as being not dirty'''
+        self.top = None
+        self.left = None
+        self.bot = None
+        self.right = None
+
+    def is_dirty(self):
+        if (self.top == None and self.bot == None
+            and self.left == None and self.right == None):
+            return False
+        assert(self.top != None and self.left != None
+               and self.bot != None and self.right != None)
+        return True
+
+class Attrs():
+    def __init__(self):
+        self.defaults = {}
+
+    def set_default(self, k, v):
+        self.defaults[k] = v
+
+    def set_next(self, attrs):
+        '''
+        the next put will have these settings,
+	Set the attributes that the next text put on the screen will have.
+	`attrs` is a dict. Any absent key is reset to its default value.
+        '''
+        self.next = {}
+        self.next['foreground'] = attrs.get('foreground', self.defaults.get('foreground'))
+        self.next['background'] = attrs.get('background', self.defaults.get('background'))
+        self.next['special'] = attrs.get('special', self.defaults.get('special'))
+        self.next['reverse'] = attrs.get('reverse', False)
+        self.next['italic'] = attrs.get('italic', False)
+        self.next['bold'] = attrs.get('bold', False)
+        self.next['underline'] = attrs.get('underline', False)
+        self.next['undercurl'] = attrs.get('undercurl', False)
+
+    def get_next(self):
+        return self.next
+
+
 
 class Screen(object):
 
@@ -44,6 +119,9 @@ class Screen(object):
         self.left = 0
         self.right = columns - 1
         self._cells = [[Cell() for c in range(columns)] for r in range(rows)]
+        self.attrs = Attrs()
+        self._dirty = DirtyState()
+        self._dirty.changed(self.top, self.left, self.bot, self.right)
 
     def clear(self):
         """Clear the screen."""
@@ -87,11 +165,13 @@ class Screen(object):
         # clear invalid cells
         for row in range(stop, stop + count, step):
             self._clear_region(row, row, left, right)
+        self._dirty.changed(top, left, bot, right)
 
     def put(self, text, attrs):
         """Put character on virtual cursor position."""
         cell = self._cells[self.row][self.col]
         cell.set(text, attrs)
+        self._dirty.changed(self.row, self.col, self.row, self.col+1)
         self.cursor_goto(self.row, self.col + 1)
 
     def get_cell(self, row, col):
@@ -132,3 +212,4 @@ class Screen(object):
             for colnum in range(left, right + 1):
                 cell = row[colnum]
                 cell.set(' ', None)
+        self._dirty.changed(top, left, bot, right)

@@ -1,12 +1,9 @@
 """Common code for graphical and text UIs."""
-from neovim.compat import IS_PYTHON3
-
-
 __all__ = ('Screen',)
 
 
-if not IS_PYTHON3:
-    range = xrange  # NOQA
+from pytknvim.util import _stringify_color
+from pytknvim.util import _split_color, _invert_color
 
 
 class Cell(object):
@@ -76,33 +73,92 @@ class DirtyState():
                and self.bot != None and self.right != None)
         return True
 
-class Attrs():
+class UiAttrsCache():
     def __init__(self):
+        self.cache = {}
+
+    def init(self, attrs):
+        self.attrs = attrs
+
+    def reset(self):
+        self.cache = {}
+
+    def get(self, nvim_attrs):
+        '''
+        nvim_attrs to ui_attrs
+        uses a cache
+        '''
+        # TODO abstract
+        # colour of -1 means we can use our own default
+        # n = normal, c = cursor
+        hash = tuple(sorted((k, v,) for k, v in (nvim_attrs or {}).items()))
+        rv = self.cache.get(hash, None)
+        if rv is None:
+            fg = self.attrs.defaults.get('foreground')
+            fg = fg if fg != -1 else 0
+            bg = self.attrs.defaults.get('background')
+            bg = bg if bg != -1 else 0xffffff
+
+            n = {'foreground': _split_color(fg),
+                'background': _split_color(bg),}
+
+            if nvim_attrs:
+                # make sure that fg and bg are assigned first
+                for k in ['foreground', 'background']:
+                    if k in nvim_attrs:
+                        n[k] = _split_color(nvim_attrs[k])
+                for k, v in nvim_attrs.items():
+                    if k == 'reverse':
+                        n['foreground'], n['background'] = \
+                            n['background'], n['foreground']
+                    elif k == 'italic':
+                        n['slant'] = 'italic'
+                    elif k == 'bold':
+                        n['weight'] = 'bold'
+                        # TODO
+                        # if self._bold_spacing:
+                            # n['letter_spacing'] \
+                                    # = str(self._bold_spacing)
+                    elif k == 'underline':
+                        n['underline'] = '1'
+            c = dict(n)
+            c['foreground'] = _invert_color(*_split_color(fg))
+            c['background'] = _invert_color(*_split_color(bg))
+            c['foreground'] = _stringify_color(*c['foreground'])
+            c['background'] = _stringify_color(*c['background'])
+            n['foreground'] = _stringify_color(*n['foreground'])
+            n['background'] = _stringify_color(*n['background'])
+            rv = (n, c)
+            self.cache[hash] = rv
+        return rv
+
+
+class Attrs():
+    '''
+    Helper to abstract efficiently handling the attributes
+    '''
+    def __init__(self):
+        # Default attrs to be applie unless next is set to overide
         self.defaults = {}
+        self.ui_cache = UiAttrsCache()
+        self.ui_cache.init(self)
 
     def set_default(self, k, v):
         self.defaults[k] = v
+        # The cache holds values computed using the defaults so reset!
+        self.ui_cache.reset()
 
-    def set_next(self, attrs):
+    def set_next(self, nvim_attrs):
         '''
         the next put will have these settings,
 	Set the attributes that the next text put on the screen will have.
 	`attrs` is a dict. Any absent key is reset to its default value.
+        the attrs are changed to conform to the ui spec
         '''
-        self.next = {}
-        self.next['foreground'] = attrs.get('foreground', self.defaults.get('foreground'))
-        self.next['background'] = attrs.get('background', self.defaults.get('background'))
-        self.next['special'] = attrs.get('special', self.defaults.get('special'))
-        self.next['reverse'] = attrs.get('reverse', False)
-        self.next['italic'] = attrs.get('italic', False)
-        self.next['bold'] = attrs.get('bold', False)
-        self.next['underline'] = attrs.get('underline', False)
-        self.next['undercurl'] = attrs.get('undercurl', False)
+        self.next = self.ui_cache.get(nvim_attrs)
 
     def get_next(self):
         return self.next
-
-
 
 class Screen(object):
 
@@ -122,6 +178,12 @@ class Screen(object):
         self.attrs = Attrs()
         self._dirty = DirtyState()
         self._dirty.changed(self.top, self.left, self.bot, self.right)
+
+    def resize(self, cols , rows):
+        # attrs shoild stick around
+        attrs = self.attrs
+        self.__init__(cols, rows)
+        self.attrs = attrs
 
     def clear(self):
         """Clear the screen."""
@@ -167,10 +229,13 @@ class Screen(object):
             self._clear_region(row, row, left, right)
         self._dirty.changed(top, left, bot, right)
 
-    def put(self, text, attrs):
+    def put(self, text):
         """Put character on virtual cursor position."""
         cell = self._cells[self.row][self.col]
-        cell.set(text, attrs)
+        # TODO put a None if the attrs is the same as the last char...
+        # would also need to update iter so that it retuns the last
+        # result if the attrs == None
+        cell.set(text, self.attrs.get_next())
         self._dirty.changed(self.row, self.col, self.row, self.col+1)
         self.cursor_goto(self.row, self.col + 1)
 
@@ -199,7 +264,7 @@ class Screen(object):
                     curcol = col
                     if not cell.text:
                         # glyph uses two cells, yield a separate entry
-                        yield row, curcol, '', None
+                        yield row, curcol, '', self.attrs.ui_cache.get(None)
                         curcol += 1
                 else:
                     buf.append(cell.text)
@@ -211,5 +276,5 @@ class Screen(object):
             row = self._cells[rownum]
             for colnum in range(left, right + 1):
                 cell = row[colnum]
-                cell.set(' ', None)
+                cell.set(' ', self.attrs.ui_cache.get(None))
         self._dirty.changed(top, left, bot, right)

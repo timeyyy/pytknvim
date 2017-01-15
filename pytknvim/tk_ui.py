@@ -125,7 +125,7 @@ class MixTk():
         after calling,
         widget changes will now be passed along to neovim
         '''
-        print('binding resize to', self, self.canvas)
+        # print('binding resize to', self, self.canvas)
         self._configure_id = self.canvas.bind('<Configure>', self._tk_resize)
 
 
@@ -134,7 +134,7 @@ class MixTk():
         after calling,
         widget size changes will not be passed along to nvim
         '''
-        print('unbinding resize from', self)
+        # print('unbinding resize from', self)
         self.canvas.unbind('<Configure>', self._configure_id)
 
     def _tk_draw_canvas(self, cols, rows):
@@ -193,9 +193,6 @@ class NvimHandler(MixTk):
 
         self._insert_cursor = False
         self._screen = None
-        self._foreground = -1
-        self._background = -1
-        self._tk_attrs_cache = {}
         self._colsize = None
         self._rowsize = None
 
@@ -250,7 +247,8 @@ class NvimHandler(MixTk):
         # TODO
         # Make sure it works when user changes font,
         # only can support mono font i think..
-        self._screen = Screen(cols, rows)
+        # self._screen = Screen(cols, rows)
+        self._screen.resize(cols, rows)
         self._tk_draw_canvas(cols, rows)
 
     @debug_echo
@@ -302,55 +300,12 @@ class NvimHandler(MixTk):
         self._screen.attrs.set_next(attrs)
 
     @debug_echo
-    def _get_tk_attrs(self, attrs):
-        key = tuple(sorted((k, v,) for k, v in (attrs or {}).items()))
-        rv = self._tk_attrs_cache.get(key, None)
-        if rv is None:
-            fg = self._foreground if self._foreground != -1\
-                                                else 0
-            bg = self._background if self._background != -1\
-                                                else 0xffffff
-            n = {'foreground': _split_color(fg),
-                'background': _split_color(bg),}
-            if attrs:
-                # make sure that fg and bg are assigned first
-                for k in ['foreground', 'background']:
-                    if k in attrs:
-                        n[k] = _split_color(attrs[k])
-                for k, v in attrs.items():
-                    if k == 'reverse':
-                        n['foreground'], n['background'] = \
-                            n['background'], n['foreground']
-                    elif k == 'italic':
-                        n['slant'] = 'italic'
-                    elif k == 'bold':
-                        n['weight'] = 'bold'
-                        # TODO
-                        # if self._bold_spacing:
-                            # n['letter_spacing'] \
-                                    # = str(self._bold_spacing)
-                    elif k == 'underline':
-                        n['underline'] = '1'
-            c = dict(n)
-            c['foreground'] = _invert_color(*_split_color(fg))
-            c['background'] = _invert_color(*_split_color(bg))
-            c['foreground'] = _stringify_color(*c['foreground'])
-            c['background'] = _stringify_color(*c['background'])
-            n['foreground'] = _stringify_color(*n['foreground'])
-            n['background'] = _stringify_color(*n['background'])
-            # n = normal, c = cursor
-            rv = (n, c)
-            self._tk_attrs_cache[key] = (n, c)
-        return rv
-
-
-    @debug_echo
     def _nvim_put(self, text):
         '''
         put a charachter into position, we only write the lines
         when a new row is being edited
         '''
-        self._screen.put(text, self._screen.attrs.get_next())
+        self._screen.put(text)
 
     def _nvim_bell(self):
         pass
@@ -387,7 +342,7 @@ class NvimHandler(MixTk):
     def _flush(self):
         if self._screen._dirty.is_dirty():
             top, left, bot, right = self._screen._dirty.get()
-            print(top, left, bot, right)
+            print('reparing ', top, left, bot, right)
             for row, col, text, attrs in self._screen.iter(
                                         top, bot, left, right - 1):
                 self._draw(row, col, text, attrs)
@@ -398,7 +353,7 @@ class NvimHandler(MixTk):
     # @debug_echo
     def _draw(self, row, col, data, attrs):
         '''
-        updates a line :)
+        updates a line :) from row,col to eol using attrs
         '''
         end = col + len(data)
         # print('_draw', row, col, repr(data))
@@ -412,8 +367,8 @@ class NvimHandler(MixTk):
             # bg = attrs['background']
 
         # get the "text" and "rect" which correspond to the current cell
-        fg = 'red'
-        bg='black'
+        fg = attrs[0]['foreground']
+        bg = attrs[0]['background']
         for i, c in enumerate(range(col, end)):
             x, y = self._tk_get_coords(row, c)
             items = self.canvas.find_overlapping(x, y, x + 1, y + 1)
@@ -430,12 +385,6 @@ class NvimHandler(MixTk):
             rect, text = sorted(items)
             self.canvas.itemconfig(text, fill=fg, font=font, text=data[i])
             self.canvas.itemconfig(rect, fill=bg)
-            # if i == 2: break
-
-        # self.text.replace(start, end, text)
-
-        # if attrs:
-            # self.text.apply_attribute(attrs, start, end)
 
 
     @debug_echo
@@ -479,7 +428,7 @@ class NvimTk(tk_util.Canvas):
         self.nvim_handler = NvimHandler(canvas=self,
                                         toplevel=toplevel,
                                         address=address,
-                                        debug_echo=True)
+                                        debug_echo=False)
 
         # TODO weak ref?
         NvimTk.instances.append(self)
@@ -541,12 +490,14 @@ class NvimTk(tk_util.Canvas):
             # print()
         # self.start_time = time.time()
         def do():
-            print()
-            print('Begin')
+            if self.nvim_handler.debug_echo:
+                print()
+                print('Begin')
             apply_updates()
             self.nvim_handler._flush()
-            print('Begin')
-            print('End')
+            if self.nvim_handler.debug_echo:
+                print('End')
+                print()
             # self.nvim_handler._start_blinking()
         self.master.after_idle(do)
 

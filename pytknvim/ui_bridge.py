@@ -88,6 +88,7 @@ class UIBridge(object):
                         # l = [','.join([str(a) for a in args])
                         #      for args in update[1:]]
                         # print >> sys.stderr, update[0], ' '.join(l)
+                        # print(update)
                         try:
                             nvim_handler = getattr(self._ui, 'nvim_handler')
                             handler = getattr(nvim_handler, '_nvim_' + update[0])
@@ -96,12 +97,12 @@ class UIBridge(object):
                         else:
                             for args in update[1:]:
                                 handler(*args)
-                except Exception as err :
+                except Exception as err:
                     print('ERROR OCCURED, unfortunalety no traceback..')
                     import pdb;pdb.set_trace()
                     self._error = format_exc()
                     self._call(self._nvim.quit)
-            if method == 'redraw':
+            if method == 'redraw' and updates:
                 self._ui.schedule_screen_update(apply_updates)
 
         self._nvim.run_loop(on_request, on_notification, on_setup)

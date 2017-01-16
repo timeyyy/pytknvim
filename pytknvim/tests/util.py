@@ -15,8 +15,8 @@ class Unnest(Exception):
     pass
 
 
-def _textwidget_rows(widget):
-    '''Return all tkinter chars as rows'''
+def _canvaswidget_rows(widget):
+    '''Return all tkinter chars as rows for a canvas widget'''
     # Rows start counting at 1 in tkinter text widget
     end_row, end_col = (int(i) for i in
                         widget.index('end-1c').split('.'))
@@ -37,6 +37,27 @@ def _textwidget_rows(widget):
     except Unnest:
         pass
 
+def _textwidget_rows(widget):
+    '''Return all tkinter chars as rows for a text widget'''
+    # Rows start counting at 1 in tkinter text widget
+    end_row, end_col = (int(i) for i in
+                        widget.index('end-1c').split('.'))
+    try:
+        for row in count(1):
+            line = []
+            for col in count(0):
+                # Exit out
+                if end_row == row:
+                   if end_col == col:
+                       raise Unnest
+                # Add if not on new line
+                char = widget.get('{0}.{1}'.format(row,col))
+                line.append(char)
+                if char == '\n':
+                    yield ''.join(i for i in line)
+                    break
+    except Unnest:
+        pass
 
 def _nvim_rows(buff):
     '''get all neovim rows'''
@@ -202,7 +223,8 @@ def compare_screens(mock_inst):
     line_length = mock_inst._screen.columns
 
     nvim_rows = _nvim_rows(mock_inst.test_nvim.buffers[BUFFER_NUM])
-    text_rows = _textwidget_rows(mock_inst.text)
+    # text_rows = _textwidget_rows(mock_inst.text)
+    text_rows = _canvaswidget_rows(mock_inst.text)
     screen_rows = _screen_rows(mock_inst._screen._cells)
 
     parsed_text = _parse_text(text_rows, line_length, mock_inst)

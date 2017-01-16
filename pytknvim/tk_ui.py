@@ -76,6 +76,7 @@ KEY_TABLE = {
     'Enter': 'CR',
 }
 
+ITEMS = {}
 
 class MixTk():
     '''
@@ -155,8 +156,9 @@ class MixTk():
                 y2 = (rownum + 1) * self._rowsize
                 # for each cell, create two items: The rectangle is used for
                 # filling background and the text is for cell contents.
-                self.canvas.create_rectangle(x1, y1, x2, y2, width=0)
-                self.canvas.create_text(x1, y1, anchor='nw', width=1, text=' ')
+                rect = self.canvas.create_rectangle(x1, y1, x2, y2, width=0)
+                text = self.canvas.create_text(x1, y1, anchor='nw', width=1, text=' ')
+                ITEMS[(rownum, colnum)] = (rect, text)
 
 
     # def _tk_clear_region(self, top, bot, left, right):
@@ -360,32 +362,37 @@ class NvimHandler(MixTk):
         # print('_draw', row, col, repr(data))
 
         font = self._fnormal
-        # if not attrs:
-            # fg = self._screen.attrs.get_next()['foreground']
-            # bg = self._screen.attrs.get_next()['background']
-        # else:
-            # fg = attrs['foreground']
-            # bg = attrs['background']
-
-        # get the "text" and "rect" which correspond to the current cell
         fg = attrs[0]['foreground']
         bg = attrs[0]['background']
+
+        # get the "text" and "rect" which correspond to the current cell
         for i, c in enumerate(range(col, end)):
-            x, y = self._tk_get_coords(row, c)
-            items = self.canvas.find_overlapping(x, y, x + 1, y + 1)
-            if len(items) != 2:
+            # x, y = self._tk_get_coords(row, c)
+            # items = self.canvas.find_overlapping(x, y, x + 1, y + 1)
+            # if len(items) != 2:
                 # caught part the double-width character in the cell to the left,
                 # filter items which dont have the same horizontal coordinate as
                 # "x"
-                predicate = lambda item: self.canvas.coords(item)[0] == x
-                items = list(filter(predicate, items))
-                if len(items) != 2:
-                    items = items[-2:]
+                # predicate = lambda item: self.canvas.coords(item)[0] == x
+                # items = list(filter(predicate, items))
+                # if len(items) != 2:
+                    # items = items[-2:]
 
             # rect has lower id than text, sort to unpack correctly
-            rect, text = sorted(items)
-            self.canvas.itemconfig(text, fill=fg, font=font, text=data[i])
-            self.canvas.itemconfig(rect, fill=bg)
+            # rect, text = sorted(items)
+            rect, text = ITEMS.get((row, c))
+            # print(rect = _rect)
+            # if rect != _rect:
+                # print('No match on rect')
+            # else:
+                # print('match on rect')
+                # import pdb;pdb.set_trace()
+            # assert _rect == rect
+            # assert text == text
+
+            print(text.__dict__)
+            # self.canvas.itemconfig(text, fill=fg, font=font, text=data[i])
+            # self.canvas.itemconfig(rect, fill=bg)
 
 
     @debug_echo

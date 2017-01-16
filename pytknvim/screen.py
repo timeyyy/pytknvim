@@ -69,6 +69,7 @@ class DirtyState():
         if (self.top == None and self.bot == None
             and self.left == None and self.right == None):
             return False
+        # TODO Remove
         assert(self.top != None and self.left != None
                and self.bot != None and self.right != None)
         return True
@@ -232,11 +233,10 @@ class Screen(object):
     def put(self, text):
         """Put character on virtual cursor position."""
         cell = self._cells[self.row][self.col]
-        # TODO put a None if the attrs is the same as the last char...
-        # would also need to update iter so that it retuns the last
+        # TODO put a None if the attrs is the same as the last char...  would also need to update iter so that it retuns the last
         # result if the attrs == None
         cell.set(text, self.attrs.get_next())
-        self._dirty.changed(self.row, self.col, self.row, self.col+1)
+        self._dirty.changed(self.row, self.col, self.row, self.col)
         self.cursor_goto(self.row, self.col + 1)
 
     def get_cell(self, row, col):

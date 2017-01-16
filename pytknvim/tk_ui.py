@@ -342,9 +342,10 @@ class NvimHandler(MixTk):
     def _flush(self):
         if self._screen._dirty.is_dirty():
             top, left, bot, right = self._screen._dirty.get()
-            print('reparing ', top, left, bot, right)
+            # print('reparing ', '%s.%s' % (top, left), '%s.%s' % (bot, right))
+            # print('max ', '%s.%s' % (self._screen.top, self._screen.left), '%s.%s' % (self._screen.bot, self._screen.right))
             for row, col, text, attrs in self._screen.iter(
-                                        top, bot, left, right - 1):
+                                        top, bot, left, right) :
                 self._draw(row, col, text, attrs)
                 # print(row, col, text, attrs)
             self._screen._dirty.reset()

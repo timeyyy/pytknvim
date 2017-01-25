@@ -1,7 +1,6 @@
 """Common code for graphical and text UIs."""
 __all__ = ('Screen',)
 
-
 from pytknvim.util import _stringify_color
 from pytknvim.util import _split_color, _invert_color
 
@@ -10,6 +9,7 @@ class Cell(object):
     def __init__(self):
         self.text = ' '
         self.attrs = None
+        self.canvas_data = None
 
     def __repr__(self):
         return self.text
@@ -25,54 +25,53 @@ class Cell(object):
         other.text = self.text
         other.attrs = self.attrs
 
-class DirtyState():
+    def set_canvas_data(self, data):
+        self.canvas_data = data
+
+    def get_canvas_data(self):
+        return self.canvas_data
+
+
+class DirtyRange():
+    def __init__(self, top, left, bot, right):
+        self.top = top
+        self.left = left
+        self.bot = bot
+        self.right = right
+
+    def __repr__(self):
+        return "%s.%s - %s.%s" % (self.top, self.left, self.bot, self.right)
+
+class DirtyScreen():
     '''
-    Return information about cells that require updating
+    Record sections that are dirty
     '''
     def __init__(self):
-        self.top = None
-        self.left = None
-        self.bot = None
-        self.right = None
+        self.dirty_ranges = []
 
     def changed(self, top, left, bot, right):
         '''mark some section as being dirty'''
-        if self.top == None:
-            self.top = top
-        else:
-            self.top = min(self.top, top)
-        if self.left == None:
-            self.left = left
-        else:
-            self.left = min(self.left, left)
-        if self.bot == None:
-            self.bot = bot
-        else:
-            self.bot = max(self.bot, bot)
-        if self.right == None:
-            self.right = right
-        else:
-            self.right = max(self.right, right)
+        # if self.dirty_ranges:
+            # last = self.dirty_ranges[-1]
+            # if last.right == left and last.bot == top:
+                # last.right = right
+                # last.bot = bot
+                # return
+        self.dirty_ranges.append(DirtyRange(top, left, bot, right))
 
     def get(self):
         ''' get the areas that are dirty, call is_dirty first'''
-        return self.top, self.left, self.bot, self.right
+        for rng in self.dirty_ranges:
+            yield rng.top, rng.left, rng.bot, rng.right
 
     def reset(self):
         '''mark the state as being not dirty'''
-        self.top = None
-        self.left = None
-        self.bot = None
-        self.right = None
+        self.dirty_ranges = []
 
     def is_dirty(self):
-        if (self.top == None and self.bot == None
-            and self.left == None and self.right == None):
-            return False
-        # TODO Remove
-        assert(self.top != None and self.left != None
-               and self.bot != None and self.right != None)
-        return True
+        if self.dirty_ranges:
+            return True
+        return False
 
 class UiAttrsCache():
     def __init__(self):
@@ -177,7 +176,7 @@ class Screen(object):
         self.right = columns - 1
         self._cells = [[Cell() for c in range(columns)] for r in range(rows)]
         self.attrs = Attrs()
-        self._dirty = DirtyState()
+        self._dirty = DirtyScreen()
         self._dirty.changed(self.top, self.left, self.bot, self.right)
 
     def resize(self, cols , rows):
@@ -228,7 +227,7 @@ class Screen(object):
         # clear invalid cells
         for row in range(stop, stop + count, step):
             self._clear_region(row, row, left, right)
-        self._dirty.changed(top, left, bot, right)
+        # self._dirty.changed(top, left, bot, right)
 
     def put(self, text):
         """Put character on virtual cursor position."""
@@ -241,11 +240,11 @@ class Screen(object):
 
     def get_cell(self, row, col):
         """Get text, attrs at row, col."""
-        return self._cells[row][col].get()
+        return self._cells[row][col]
 
     def get_cursor(self):
         """Get text, attrs at the virtual cursor position."""
-        return self.get_cell(self.row, self.col)
+        return self.get_cell(self.row, self.col).get()
 
     def iter(self, startrow, endrow, startcol, endcol):
         """Extract text/attrs at row, startcol-endcol."""

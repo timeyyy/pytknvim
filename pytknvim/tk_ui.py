@@ -11,6 +11,7 @@ import sys
 import math
 import time
 from neovim import attach
+from pprint import pprint
 
 from tkquick.gui.tools import rate_limited
 
@@ -76,14 +77,18 @@ KEY_TABLE = {
     'Enter': 'CR',
 }
 
-ITEMS = {}
-
 class MixTk():
     '''
     Tkinter actions we bind and use to communicate to neovim
     '''
     def tk_key_pressed(self,event, **k):
         keysym = event.keysym
+        if keysym == 'F5':
+            def do(x, fill='red'):
+                self.canvas.itemconfig(x, fill=fill)
+            def gi(row=2, col=2):
+                return self._screen._cells[self._screen.bot-row][col].canvas_data[1]
+            import pdb;pdb.set_trace()
         state = parse_tk_state(event.state)
         if event.char not in ('', ' ') \
                     and state in (None, 'Shift'):
@@ -105,7 +110,8 @@ class MixTk():
     def _tk_quit(self, *args):
         self._bridge.exit()
 
-    @rate_limited(1/RESIZE_DELAY, mode='kill')
+    # @rate_limited(1/RESIZE_DELAY, mode='kill')
+    @debug_echo
     def _tk_resize(self, event):
         '''Let Neovim know we are changing size'''
         cols = int(math.floor(event.width / self._colsize))
@@ -141,11 +147,14 @@ class MixTk():
     def _tk_draw_canvas(self, cols, rows):
         self._tk_fill_region(0, rows - 1, 0, cols - 1)
 
-    def _tk_fill_region(self, top, bot, left, right):
+
+    # @debug_echo
+    def _tk_fill_region(self, top, bot, left, right, delete=False):
         # create columns from right to left so the left columns have a
         # higher z-index than the right columns. This is required to
         # properly display characters that cross cell boundary
 
+        # if delete:
         self._tk_destroy_region(top, bot, left, right)
 
         for rownum in range(bot, top - 1, -1):
@@ -158,17 +167,19 @@ class MixTk():
                 # filling background and the text is for cell contents.
                 rect = self.canvas.create_rectangle(x1, y1, x2, y2, width=0)
                 text = self.canvas.create_text(x1, y1, anchor='nw', width=1, text=' ')
-                ITEMS[(rownum, colnum)] = (rect, text)
+                cell = self._screen.get_cell(rownum, colnum)
+                cell.set_canvas_data((rect, text))
 
 
-    # def _tk_clear_region(self, top, bot, left, right):
-        # attrs = self._get_tk_attrs(None)
-        # bg = attrs[1].get('background')
+    def _tk_clear_region(self, top, bot, left, right):
+        attrs = self._screen.attrs.ui_cache.get(None)
+        bg = attrs[1].get('background')
 
-        # self._tk_tag_region('clear', top, bot, left, right)
-        # self.canvas.itemconfig('clear', fill=bg)
-        # self.canvas.dtag('clear', 'clear')
+        self._tk_tag_region('clear', top, bot, left, right)
+        self.canvas.itemconfig('clear', fill=bg)
+        self.canvas.dtag('clear', 'clear')
 
+    # @debug_echo
     def _tk_destroy_region(self, top, bot, left, right):
         self._tk_tag_region('destroy', top, bot, left, right)
         self.canvas.delete('destroy')
@@ -220,8 +231,9 @@ class NvimHandler(MixTk):
         # self.canvas.config(font=self._fnormal)
         self._colsize = self._fnormal.measure('M')
         self._rowsize = self._fnormal.metrics('linespace')
+        self.canvas.configure(xscrollincrement=self._rowsize)
 
-    @debug_echo
+    # @debug_echo
     def connect(self, *nvim_args, address=None, headless=False, exec_name='nvim'):
         # Value has been set, otherwise default to this functions default value
         if self.address != -1 and not address:
@@ -253,26 +265,26 @@ class NvimHandler(MixTk):
         self._screen.resize(cols, rows)
         self._tk_draw_canvas(cols, rows)
 
-    @debug_echo
+    # @debug_echo
     def _nvim_clear(self):
         '''
         wipe everyything, even the ~ and status bar
         '''
         self._screen.clear()
 
-    @debug_echo
+    # @debug_echo
     def _nvim_eol_clear(self):
         '''
         clear from cursor position to the end of the line
         '''
         self._screen.eol_clear()
 
-    @debug_echo
+    # @debug_echo
     def _nvim_cursor_goto(self, row, col):
         '''Move gui cursor to position'''
         self._screen.cursor_goto(row, col)
 
-    @debug_echo
+    # @debug_echo
     def _nvim_busy_start(self):
         self._busy = True
 
@@ -285,23 +297,83 @@ class NvimHandler(MixTk):
     def _nvim_mouse_off(self):
         self.mouse_enabled = False
 
-    @debug_echo
+    # @debug_echo
     def _nvim_mode_change(self, mode):
         self._insert_cursor = mode == 'insert'
 
     @debug_echo
     def _nvim_set_scroll_region(self, top, bot, left, right):
         self._screen.set_scroll_region(top, bot, left, right)
+        # x1 = left * self._colsize
+        # y1 = top * self._rowsize
+        # x2 = right * self._colsize
+        # y2 = bot * self._rowsize
+        rect1 = self._screen.get_cell(top, left).canvas_data[1]
+        rect2 = self._screen.get_cell(bot - 1, right).canvas_data[1]
+        x1, y1, *_ = self.canvas.bbox(rect1)
+        x2, y2, *_ = self.canvas.bbox(rect2)
+        rgn = (x1, y1, x2, y2)
+        # self.canvas.configure(scrollregion=rgn)
+        # rect = self.canvas.create_rectangle(x1, y1, x2, y2, width=0, fill='blue')
 
     @debug_echo
     def _nvim_scroll(self, count):
         self._screen.scroll(count)
+        # return
+        top = self._screen.top
+        bot = self._screen.bot
+        # left = self._screen.left
+        # right = self._screen.right
 
-    @debug_echo
+        if count > 0:
+            del_top = top
+            del_bot = top + count - 1
+            move_top = del_bot + 1
+            move_bot = bot
+            fill_top = move_bot -1 #+ count - 1
+            fill_bot = fill_top + count
+            clean_top = fill_top - 1
+            clean_bot = fill_bot
+
+            src_top, src_bot = top + count, bot
+            dst_top, dst_bot = top, bot - count
+            clr_top, clr_bot = dst_bot, src_bot
+        else:
+            del_top = bot + count + 1
+            del_bot = bot
+            move_top = top
+            move_bot = del_top - 1
+            fill_bot = move_top - 1
+            fill_top = fill_bot + count + 1
+            clean_top = fill_top
+            clean_bot = fill_bot + 1
+
+        # print(del_top, del_bot)
+        # print(move_top, move_bot)
+        # print(fill_top, fill_bot)
+        self.canvas.yview_scroll(1, 'units')
+        # self.canvas.yv
+
+        # self._tk_tag_region('del', del_top, del_bot, self._screen.left, self._screen.right)
+        # self.canvas.itemconfigure('del', fill='red')
+        # self._tk_destroy_region(del_top, del_bot, self._screen.left, self._screen.right)
+        # self._tk_tag_region('move', move_top, move_bot, self._screen.left, self._screen.right)
+        # self.canvas.move('move', 0, -count * self._rowsize)
+        # self.canvas.dtag('move', 'move')
+        # self._tk_tag_region('fill', fill_top, fill_bot, self._screen.left, self._screen.right)
+        # self.canvas.itemconfigure('fill', fill='green')
+        # self._tk_tag_region('clean', clean_top, clean_bot, self._screen.left, self._screen.right)
+        # self.canvas.itemconfigure('clean', fill='green')
+        # self._tk_fill_region(clean_top, clean_bot, self._screen.left, self._screen.right)
+        # self._screen._dirty.changed(clean_top, self._screen.left, clean_bot, self._screen.right)
+        # self._screen._dirty.changed(top, self._screen.left, bot, self._screen.left + 3)
+        self._screen._dirty.changed(self._screen.top, self._screen.left, self._screen.bot, self._screen.right)
+
+    # @debug_echo
     def _nvim_highlight_set(self, attrs):
         self._screen.attrs.set_next(attrs)
 
-    @debug_echo
+    # @debug_echo
     def _nvim_put(self, text):
         '''
         put a charachter into position, we only write the lines
@@ -315,15 +387,15 @@ class NvimHandler(MixTk):
     def _nvim_visual_bell(self):
         pass
 
-    @debug_echo
+    # @debug_echo
     def _nvim_update_fg(self, fg):
         self._screen.attrs.set_default('foreground', fg)
 
-    @debug_echo
+    # @debug_echo
     def _nvim_update_bg(self, bg):
         self._screen.attrs.set_default('background', bg)
 
-    @debug_echo
+    # @debug_echo
     def _nvim_update_sp(self, sp):
         self._screen.attrs.set_default('special', sp)
 
@@ -340,16 +412,20 @@ class NvimHandler(MixTk):
         self._icon = tk.PhotoImage(file=icon)
         self.root.tk.call('wm', 'iconphoto', self.root._w, self._icon)
 
-    @debug_echo
+    # @debug_echo
     def _flush(self):
         if self._screen._dirty.is_dirty():
-            top, left, bot, right = self._screen._dirty.get()
-            # print('reparing ', '%s.%s' % (top, left), '%s.%s' % (bot, right))
-            # print('max ', '%s.%s' % (self._screen.top, self._screen.left), '%s.%s' % (self._screen.bot, self._screen.right))
-            for row, col, text, attrs in self._screen.iter(
-                                        top, bot, left, right) :
-                self._draw(row, col, text, attrs)
-                # print(row, col, text, attrs)
+            print()
+            print('dirty')
+            print(self._screen._dirty.dirty_ranges)
+            print()
+            for top, left, bot, right in self._screen._dirty.get():
+                # print('reparing ', '%s.%s' % (top, left), '%s.%s' % (bot, right))
+                # print('max ', '%s.%s' % (self._screen.top, self._screen.left), '%s.%s' % (self._screen.bot, self._screen.right))
+                for row, col, text, attrs in self._screen.iter(
+                                            top, bot, left, right) :
+                    # print('rep', row, col, text)
+                    self._draw(row, col, text, attrs)
             self._screen._dirty.reset()
 
 
@@ -365,36 +441,15 @@ class NvimHandler(MixTk):
         fg = attrs[0]['foreground']
         bg = attrs[0]['background']
 
-        # get the "text" and "rect" which correspond to the current cell
         for i, c in enumerate(range(col, end)):
-            # x, y = self._tk_get_coords(row, c)
-            # items = self.canvas.find_overlapping(x, y, x + 1, y + 1)
-            # if len(items) != 2:
-                # caught part the double-width character in the cell to the left,
-                # filter items which dont have the same horizontal coordinate as
-                # "x"
-                # predicate = lambda item: self.canvas.coords(item)[0] == x
-                # items = list(filter(predicate, items))
-                # if len(items) != 2:
-                    # items = items[-2:]
-
-            # rect has lower id than text, sort to unpack correctly
-            # rect, text = sorted(items)
-            rect, text = ITEMS.get((row, c))
-            # print(rect = _rect)
-            # if rect != _rect:
-                # print('No match on rect')
-            # else:
-                # print('match on rect')
-                # import pdb;pdb.set_trace()
-            # assert _rect == rect
-            # assert text == text
+            cell = self._screen.get_cell(row, c)
+            rect, text = cell.get_canvas_data()
 
             self.canvas.itemconfig(text, fill=fg, font=font, text=data[i])
             self.canvas.itemconfig(rect, fill=bg)
 
 
-    @debug_echo
+    # @debug_echo
     def _nvim_exit(self, arg):
         print('in exit')
         import pdb;pdb.set_trace()
@@ -435,7 +490,7 @@ class NvimTk(tk_util.Canvas):
         self.nvim_handler = NvimHandler(canvas=self,
                                         toplevel=toplevel,
                                         address=address,
-                                        debug_echo=False)
+                                        debug_echo=True)
 
         # TODO weak ref?
         NvimTk.instances.append(self)
@@ -512,6 +567,3 @@ class NvimTk(tk_util.Canvas):
     def quit(self):
         ''' destroy the widget, called from the bridge'''
         self.after_idle(self.destroy)
-
-# if __name__ == '__main__':
-    # main()

@@ -18,24 +18,28 @@ class Unnest(Exception):
 def _canvaswidget_rows(widget):
     '''Return all tkinter chars as rows for a canvas widget'''
     # Rows start counting at 1 in tkinter text widget
-    end_row, end_col = (int(i) for i in
-                        widget.index('end-1c').split('.'))
-    try:
-        for row in count(1):
-            line = []
-            for col in count(0):
-                # Exit out
-                if end_row == row:
-                   if end_col == col:
-                       raise Unnest
-                # Add if not on new line
-                char = widget.get('{0}.{1}'.format(row,col))
-                line.append(char)
-                if char == '\n':
-                    yield ''.join(i for i in line)
-                    break
-    except Unnest:
-        pass
+    # import pdb;pdb.set_trace()
+    # end_row, end_col = (int(i) for i in
+                        # widget.index('end-1c').split('.'))
+    # TODO don't hack from the screnn. :/
+    end_row = widget._screen.bot
+    end_col = widget._screen.right
+
+    for row in range(end_row):
+        line = []
+        for col in range(end_col):
+            # Add if not on new line
+            # char = widget.get('{0}.{1}'.format(row,col))
+            try:
+                char = widget._screen.get_cell(row, col).text
+            except Exception:
+                import pdb;pdb.set_trace()
+            line.append(char)
+            if char == '\n':
+                yield ''.join(i for i in line)
+                break
+        else:
+            yield ''.join(i for i in line)
 
 def _textwidget_rows(widget):
     '''Return all tkinter chars as rows for a text widget'''

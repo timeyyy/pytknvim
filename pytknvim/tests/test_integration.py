@@ -132,7 +132,7 @@ class TestIntegration(VimCommands):
     def compare_screens(self):
         compare_screens(self.nvimtk)
 
-    @pytest.mark.simple
+    @pytest.mark.simple1
     def test_load(self):
         self.compare_screens()
 

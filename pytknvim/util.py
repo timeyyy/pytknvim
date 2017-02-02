@@ -38,6 +38,7 @@ def attach_socket(path=None):
 def attach_child(nvim_args, exec_name='nvim'):
     nvim_binary = find_executable(exec_name)
     args = [nvim_binary, '--embed']
+    args = ['/home/alfa/Documents/git/neovim/build/bin/nvim', '--embed']
     if nvim_args:
         args.extend(nvim_args)
     return attach('child', argv=args)
@@ -49,6 +50,7 @@ def attach_headless(nvim_args=None, path=None):
     os.environ['NVIM_LISTEN_ADDRESS'] = path
     dnull = open(os.devnull)
     # TODO WHY USE SHLEX???
+    import pdb;pdb.set_trace()
     cmd = shlex.split('nvim --headless')
     if nvim_args:
         cmd.extend(nvim_args)

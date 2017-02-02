@@ -273,7 +273,7 @@ class NvimHandler(MixTk):
         self._bridge.connect(nvim, self.text)
         self._screen = Screen(self.current_cols, self.current_rows)
         self._bridge.attach(self.current_cols, self.current_rows, rgb=True)
-        bridge._call(bridge._nvim.request, "ui_set_popupmenu_external", True)
+        # self._bridge._call(self._bridge._nvim.request, "ui_set_popupmenu_external", True)
         self.connected = True
         self.text.nvim = nvim
         return nvim

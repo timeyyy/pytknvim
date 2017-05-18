@@ -12,7 +12,7 @@ import math
 import time
 from neovim import attach
 
-from tkquick.gui.tools import rate_limited
+# from tkquick.gui.tools import rate_limited
 
 from pytknvim.ui_bridge import UIBridge
 from pytknvim.screen import Screen
@@ -112,7 +112,7 @@ class MixTk():
         self._bridge.exit()
 
 
-    @rate_limited(1/RESIZE_DELAY, mode='kill')
+    # @rate_limited(1/RESIZE_DELAY, mode='kill')
     def _tk_resize(self, event):
         '''Let Neovim know we are changing size'''
         cols = int(math.floor(event.width / self._colsize))
